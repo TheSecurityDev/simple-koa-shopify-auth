@@ -1,0 +1,1 @@
+# simple-koa-shopify-auth
