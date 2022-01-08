@@ -1,6 +1,6 @@
-import { Context, Next } from "koa";
 import Shopify from "@shopify/shopify-api";
 import { HttpResponseError } from "@shopify/shopify-api/dist/error";
+import { Context, Next } from "koa";
 
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
 

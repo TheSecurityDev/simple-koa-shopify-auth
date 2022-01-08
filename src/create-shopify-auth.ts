@@ -1,5 +1,5 @@
-import { Context, Next } from "koa";
 import Shopify, { AuthQuery } from "@shopify/shopify-api";
+import { Context, Next } from "koa";
 
 import {
   createTopLevelOAuthRedirect,
