@@ -1,6 +1,6 @@
 {
   "name": "simple-koa-shopify-auth",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A better, simplified version of the (no longer supported) @Shopify/koa-shopify-auth middleware library. It removes the use of cookies for sessions (which greatly smooths the auth process), replaces a deprecated API call, and supports v2 of the official @shopify/shopify-api package.",
   "author": "TheSecurityDev",
   "license": "MIT",
@@ -20,7 +20,8 @@
   ],
   "main": "lib/index.js",
   "files": [
-    "lib"
+    "lib",
+    "app-bridge"
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -32,5 +33,6 @@
   },
   "peerDependencies": {
     "@shopify/shopify-api": "^2.0.0"
-  }
+  },
+  "devDependencies": {}
 }

@@ -1,6 +1,10 @@
+import { readFile } from "fs/promises";
+import { resolve as resolvePath } from "path";
 import { Context } from "koa";
 
 export const TOP_LEVEL_OAUTH_COOKIE_NAME = "shopifyTopLevelOAuth"; // If this is set, then it knows to perform inline oauth
+const RELATIVE_APP_BRIDGE_PATH = "../app-bridge/app-bridge@2.0.5.js";
+const APP_BRIDGE_FILE_PATH = resolvePath(__dirname, RELATIVE_APP_BRIDGE_PATH); // Get global path from relative path to this module
 
 export function setTopLevelOAuthCookieValue(ctx: Context, value: string) {
   ctx.cookies.set(
@@ -23,26 +27,34 @@ function getCookieOptions(ctx: Context) {
 
 export function createTopLevelOAuthRedirect(apiKey: string, path: string) {
   const redirect = createTopLevelRedirect(apiKey, path);
-  return function topLevelOAuthRedirect(ctx: Context) {
+  return async function topLevelOAuthRedirect(ctx: Context) {
     setTopLevelOAuthCookieValue(ctx, "1");
-    redirect(ctx);
+    await redirect(ctx);
   };
 }
 
 export function createTopLevelRedirect(apiKey: string, path: string) {
-  return function topLevelRedirect(ctx: Context) {
+  return async function topLevelRedirect(ctx: Context) {
     const { host, query } = ctx;
     const shop = query.shop ? query.shop.toString() : "";
     const params = { shop };
     const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.queryString, because it sanitizes the query parameters we are using
-    ctx.body = getTopLevelRedirectScript(shop, `https://${host}${path}?${queryString}`, apiKey);
+    ctx.body = await getTopLevelRedirectScript(
+      shop,
+      `https://${host}${path}?${queryString}`,
+      apiKey
+    );
   };
 }
 
-// TODO: Can we not use unpkg.com? (because sometimes it's very slow)
-function getTopLevelRedirectScript(origin: string, redirectTo: string, apiKey: string): string {
+async function getTopLevelRedirectScript(origin: string, redirectTo: string, apiKey: string) {
+  // We used to load the script from unpkg.com, but that sometimes was too slow, so we are now loading the script file directly and injecting the code.
+  const appBridgeScript = await readFile(APP_BRIDGE_FILE_PATH);
   return `
-    <script src="https://unpkg.com/@shopify/app-bridge@^1"></script> <script type="text/javascript">
+    <!-- Shopify App Bridge -->
+    <!-- <script src="https://unpkg.com/@shopify/app-bridge@^2"></script> -->
+    <script type="text/javascript">${appBridgeScript}</script>
+    <script type="text/javascript">
       document.addEventListener('DOMContentLoaded', function() {
         if (window.top === window.self) {
           // If the current window is the 'parent', change the URL by setting location.href
