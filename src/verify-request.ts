@@ -1,4 +1,5 @@
 import Shopify from "@shopify/shopify-api";
+import { Session } from "@shopify/shopify-api/dist/auth/session";
 import { HttpResponseError } from "@shopify/shopify-api/dist/error";
 import { Context, Next } from "koa";
 
@@ -30,11 +31,13 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
   };
 
   return async function verifyTokenMiddleware(ctx: Context, next: Next) {
-    const session = await Shopify.Utils.loadCurrentSession(
+    const sessionData = await Shopify.Utils.loadCurrentSession(
       ctx.req,
       ctx.res,
       accessMode === "online"
     );
+    // Create session instance from loaded session data (if available), so we can call isActive() method on it
+    const session = sessionData ? Session.cloneSession(sessionData, sessionData.id) : null;
 
     const { query } = ctx;
     const shop = query.shop ? query.shop.toString() : "";
