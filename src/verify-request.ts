@@ -49,7 +49,11 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
     if (session) {
       // Verify session is valid
-      if (session.isActive()) {
+      if (
+        Shopify.Context.SCOPES.equals(session.scope) && 
+        session.accessToken &&
+        (!session.expires || session.expires >= new Date())
+        ) {
         try {
           // I think we need to verify on Shopify's side that the access token is valid, because otherwise anyone could just make their own 'valid' token and use it.
           //   Of course if we're making requests to Shopify's API afterwords it will fail with an error, but we still need this check since we aren't always making a Shopify request when verifying this token (it might be an API request for our server, and we need to be sure it's the correct user).
