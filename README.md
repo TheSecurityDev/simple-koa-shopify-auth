@@ -36,6 +36,10 @@ _Importing differs slightly from the official library in that the `createShopify
 
 ### Using verifyRequest for verifying session token on routes:
 
+#### NOTE:
+
+**If the session is invalid it will return a `401 Unauthorized` status code, that you can handle on the client side. _This is a breaking change from the official library, which returns `403 Forbidden`._**
+
 For requests, create the middleware like this:
 
 ```js
