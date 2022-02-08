@@ -1,5 +1,7 @@
 import { readFile } from "fs/promises";
 import { resolve as resolvePath } from "path";
+
+import Shopify from "@shopify/shopify-api";
 import { Context } from "koa";
 
 export const TOP_LEVEL_OAUTH_COOKIE_NAME = "shopifyTopLevelOAuth"; // If this is set, then it knows to perform inline oauth
@@ -25,26 +27,24 @@ function getCookieOptions(ctx: Context) {
   return cookieOptions;
 }
 
-export function createTopLevelOAuthRedirect(apiKey: string, path: string, host:string|undefined) {
-  const redirect = createTopLevelRedirect(apiKey, path, host);
+export function createTopLevelOAuthRedirect(apiKey: string, path: string) {
+  const redirect = createTopLevelRedirect(apiKey, path);
   return async function topLevelOAuthRedirect(ctx: Context) {
     setTopLevelOAuthCookieValue(ctx, "1");
     await redirect(ctx);
   };
 }
 
-export function createTopLevelRedirect(apiKey: string, path: string, hostname:string|undefined) {
+export function createTopLevelRedirect(apiKey: string, path: string) {
   return async function topLevelRedirect(ctx: Context) {
-    let { host, query } = ctx;
-    if( typeof hostname === 'string' ){
-      host = hostname;
-    }
+    let { query } = ctx;
+    const hostName = Shopify.Context.HOST_NAME; // Use this instead of ctx.host to prevent issues when behind a proxy
     const shop = query.shop ? query.shop.toString() : "";
     const params = { shop };
     const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.queryString, because it sanitizes the query parameters we are using
     ctx.body = await getTopLevelRedirectScript(
       shop,
-      `https://${host}${path}?${queryString}`,
+      `https://${hostName}${path}?${queryString}`,
       apiKey
     );
   };
