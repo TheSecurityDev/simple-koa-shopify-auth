@@ -11,6 +11,7 @@ type OAuthBeginConfig = {
   accessMode: "online" | "offline";
   authPath: string;
   afterAuth(ctx: Context): Promise<void>;
+  host?: string;
 };
 
 function shouldPerformInlineOAuth({ cookies }: Context) {
@@ -36,7 +37,8 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
 
   const topLevelOAuthRedirect = createTopLevelOAuthRedirect(
     Shopify.Context.API_KEY,
-    inlineOAuthPath
+    inlineOAuthPath,
+    options.host
   );
 
   // This executes for every request
