@@ -25,17 +25,20 @@ function getCookieOptions(ctx: Context) {
   return cookieOptions;
 }
 
-export function createTopLevelOAuthRedirect(apiKey: string, path: string) {
-  const redirect = createTopLevelRedirect(apiKey, path);
+export function createTopLevelOAuthRedirect(apiKey: string, path: string, host:string|undefined) {
+  const redirect = createTopLevelRedirect(apiKey, path, host);
   return async function topLevelOAuthRedirect(ctx: Context) {
     setTopLevelOAuthCookieValue(ctx, "1");
     await redirect(ctx);
   };
 }
 
-export function createTopLevelRedirect(apiKey: string, path: string) {
+export function createTopLevelRedirect(apiKey: string, path: string, hostname:string|undefined) {
   return async function topLevelRedirect(ctx: Context) {
-    const { host, query } = ctx;
+    let { host, query } = ctx;
+    if( typeof hostname === 'string' ){
+      host = hostname;
+    }
     const shop = query.shop ? query.shop.toString() : "";
     const params = { shop };
     const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.queryString, because it sanitizes the query parameters we are using
