@@ -48,7 +48,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
 
     if (path === inlineOAuthPath || (path === oAuthStartPath && shouldPerformInlineOAuth(ctx))) {
       // Auth started
-      if (!Shopify.Utils.validateShop(shop)) {
+      if (!validateShop(shop)) {
         // Invalid shop
         ctx.response.status = 400;
         ctx.response.body = shop ? "Invalid shop parameter" : "Missing shop parameter";
@@ -106,4 +106,9 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
 
     await next();
   };
+}
+
+export function validateShop(shop: string): boolean {
+  const shopUrlRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.(com|io)[/]*$/;
+  return shopUrlRegex.test(shop);
 }
