@@ -65,7 +65,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         } catch (err) {
           if (
             err instanceof HttpResponseError &&
-            (err.code === 401 || (err as any).response?.code === 401) // Shopify API v3 uses 'response.code' instead of 'code'
+            ((err as any)?.code === 401 || err.response?.code === 401) // Shopify API v3+ uses 'response.code' instead of 'code'
           ) {
             // Session not valid, we will re-authorize
           } else {

@@ -6,7 +6,7 @@ https://www.npmjs.com/package/simple-koa-shopify-auth
 
 ## Description:
 
-A better, simplified version of the (no longer supported) [@Shopify/koa-shopify-auth](https://github.com/Shopify/koa-shopify-auth) middleware library. It removes the use of cookies for sessions (which greatly smooths the auth process by requiring fewer redirects in some cases), replaces a deprecated API call, and supports v2 of the official [@shopify/shopify-api](https://github.com/Shopify/shopify-node-api) package.
+A better, simplified version of the (no longer supported) [@Shopify/koa-shopify-auth](https://github.com/Shopify/koa-shopify-auth) middleware library. It removes the use of cookies for sessions (which greatly smooths the auth process by requiring fewer redirects in some cases), replaces a deprecated API call, and supports v5 of the official [@shopify/shopify-api](https://github.com/Shopify/shopify-node-api) package.
 
 ## Installation:
 
@@ -16,11 +16,11 @@ npm i simple-koa-shopify-auth
 
 ## Requirements:
 
-**This package assumes you have `@shopify/shopify-api` v2 already installed. If you are on v1.x.x you will need to upgrade to the latest version with `npm i @shopify/shopify-api@latest`.**
+**This package assumes you have `@shopify/shopify-api` v5 already installed. If you are on a lower version you will need to upgrade to the latest version with `npm i @shopify/shopify-api@latest`.**
 
 #### WARNING:
 
-**`@shopify/shopify-api` v2 has some breaking changes from v1. Please [check the changelog](https://github.com/Shopify/shopify-node-api/blob/v2.0.0/CHANGELOG.md#200---2021-10-28) to see all the changes, and update your code accordingly.**
+**Please [check the changelog](https://github.com/Shopify/shopify-api-node/blob/v5.0.1/CHANGELOG.md) to see all the changes, and update your code accordingly.**
 
 ## Usage:
 
