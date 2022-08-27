@@ -90,15 +90,15 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
         switch (true) {
           case err instanceof Shopify.Errors.InvalidOAuthError:
             ctx.throw(400, err.message);
-            break;
           case err instanceof Shopify.Errors.CookieNotFound:
           case err instanceof Shopify.Errors.SessionNotFound:
             // This is likely because the OAuth session cookie expired before the merchant approved the request
             ctx.redirect(`${oAuthStartPath}?shop=${shop}`);
             break;
+          case err instanceof Shopify.Errors.InvalidJwtError:
+            ctx.throw(401, err.message);
           default:
             ctx.throw(500, err.message);
-            break;
         }
       }
       return;
