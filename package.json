@@ -28,11 +28,11 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {},
-  "optionalDependencies": {
-    "@types/koa": "^2.13.4"
-  },
   "peerDependencies": {
     "@shopify/shopify-api": "^5.0.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/koa": "^2.13.4",
+    "typescript": "^4.8.3"
+  }
 }
