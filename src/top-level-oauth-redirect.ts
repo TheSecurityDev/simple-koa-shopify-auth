@@ -5,7 +5,7 @@ import Shopify from "@shopify/shopify-api";
 import { Context } from "koa";
 
 export const TOP_LEVEL_OAUTH_COOKIE_NAME = "shopifyTopLevelOAuth"; // If this is set, then it knows to perform inline oauth
-const RELATIVE_APP_BRIDGE_PATH = "../app-bridge/app-bridge@2.0.5.js";
+const RELATIVE_APP_BRIDGE_PATH = "../app-bridge/app-bridge@3.2.6.js";
 const APP_BRIDGE_FILE_PATH = resolvePath(__dirname, RELATIVE_APP_BRIDGE_PATH); // Get global path from relative path to this module
 
 export function setTopLevelOAuthCookieValue(ctx: Context, value: string) {
