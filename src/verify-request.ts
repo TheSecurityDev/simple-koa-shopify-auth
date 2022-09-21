@@ -35,9 +35,10 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
     // Create session instance from loaded session data (if available), so we can call isActive() method on it
     const session = sessionData ? Session.cloneSession(sessionData, sessionData.id) : null;
 
-    const { query, querystring } = ctx;
+    const { query } = ctx;
+    const queryString = new URLSearchParams(query as any).toString();
     const shop = query.shop ? query.shop.toString() : "";
-    const authUrl = `${authRoute}?${querystring}`;
+    const authUrl = `${authRoute}?${queryString}`;
 
     // Login again if the shops don't match
     if (session && shop && session.shop !== shop) {
