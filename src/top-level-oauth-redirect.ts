@@ -41,7 +41,7 @@ export function createTopLevelRedirect(apiKey: string, path: string) {
     const hostName = Shopify.Context.HOST_NAME; // Use this instead of ctx.host to prevent issues when behind a proxy
     const shop = query.shop ? query.shop.toString() : "";
     const params = { shop };
-    const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.queryString, because it sanitizes the query parameters we are using
+    const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.querystring, because it sanitizes the query parameters we are using
     ctx.body = await getTopLevelRedirectScript(
       shop,
       `https://${hostName}${path}?${queryString}`,

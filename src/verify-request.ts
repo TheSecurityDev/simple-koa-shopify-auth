@@ -35,15 +35,13 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
     // Create session instance from loaded session data (if available), so we can call isActive() method on it
     const session = sessionData ? Session.cloneSession(sessionData, sessionData.id) : null;
 
-    const { query } = ctx;
-    const queryString = new URLSearchParams(query as any).toString();
+    const { query, querystring } = ctx;
     const shop = query.shop ? query.shop.toString() : "";
-    const authUrl = `${authRoute}?${queryString}`;
 
     // Login again if the shops don't match
     if (session && shop && session.shop !== shop) {
       await clearSession(ctx, accessMode);
-      ctx.redirect(authUrl);
+      ctx.redirect(`${authRoute}?${querystring}`);
       return;
     }
 
@@ -86,10 +84,11 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       } else if (Shopify.Context.IS_EMBEDDED_APP) {
         shop = getShopFromAuthHeader(ctx); // Get shop from auth header
       }
-      ctx.response.set(REAUTH_URL_HEADER, authUrl); // Set the reauth url header
+      const reauthUrl = `${authRoute}?shop=${shop}`;
+      ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
     } else {
       // Otherwise redirect to the auth page
-      ctx.redirect(authUrl);
+      ctx.redirect(`${authRoute}?${querystring}`);
     }
   };
 }
