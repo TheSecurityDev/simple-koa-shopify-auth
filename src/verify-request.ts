@@ -78,13 +78,12 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       ctx.response.status = 401;
       ctx.response.set(REAUTH_HEADER, "1"); // Tell the client to re-authorize by setting the reauth header
       // Get the shop from the session, or the auth header (we can't get it from the query if we're making a post request)
-      let shop: string;
-      if (session) {
-        shop = session.shop; // Get shop from the session token
-      } else if (Shopify.Context.IS_EMBEDDED_APP) {
-        shop = getShopFromAuthHeader(ctx); // Get shop from auth header
+      let reauthUrl = authRoute;
+      if (Shopify.Context.IS_EMBEDDED_APP) {
+        reauthUrl += `?${getShopAndHostQueryStringFromAuthHeader(ctx)}`;
+      } else if (session?.shop) {
+        reauthUrl += `?shop=${session.shop}`; // This won't have the host param, which probably won't work (but this library is meant for embedded apps, so it's not a big deal; do non-embedded apps even need the host param?)
       }
-      const reauthUrl = `${authRoute}?shop=${shop}`;
       ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
     } else {
       // Otherwise redirect to the auth page
@@ -105,13 +104,14 @@ async function clearSession(ctx: Context, accessMode = defaultOptions.accessMode
   }
 }
 
-function getShopFromAuthHeader(ctx: Context) {
+function getShopAndHostQueryStringFromAuthHeader(ctx: Context): string {
   const authHeader: string = ctx.req.headers.authorization;
   const matches = authHeader?.match(/Bearer (.*)/);
   if (matches) {
     const payload = Shopify.Utils.decodeSessionToken(matches[1]);
     const shop = payload.dest.replace("https://", "");
-    return shop;
+    const host = Buffer.from(payload.iss.replace("https://", "")).toString("base64");
+    return new URLSearchParams({ shop, host }).toString();
   }
   return null;
 }
