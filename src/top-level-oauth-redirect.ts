@@ -55,7 +55,6 @@ async function getTopLevelRedirectScript(origin: string, redirectTo: string, api
   const appBridgeScript = await readFile(APP_BRIDGE_FILE_PATH);
   return `
     <!-- Shopify App Bridge -->
-    <!-- <script src="https://unpkg.com/@shopify/app-bridge@^2"></script> -->
     <script type="text/javascript">${appBridgeScript}</script>
     <script type="text/javascript">
       document.addEventListener('DOMContentLoaded', function() {
