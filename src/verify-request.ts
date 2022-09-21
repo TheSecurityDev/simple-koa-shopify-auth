@@ -20,10 +20,6 @@ const defaultOptions: VerifyRequestOptions = {
 const REAUTH_HEADER = "X-Shopify-API-Request-Failure-Reauthorize";
 const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
 
-function getAuthUrl(authRoute: string, shop: string): string {
-  return `${authRoute}?shop=${shop}`;
-}
-
 export default function verifyRequest(options?: VerifyRequestOptions) {
   const { accessMode, returnHeader, authRoute } = {
     ...defaultOptions,
@@ -39,14 +35,14 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
     // Create session instance from loaded session data (if available), so we can call isActive() method on it
     const session = sessionData ? Session.cloneSession(sessionData, sessionData.id) : null;
 
-    const { query } = ctx;
+    const { query, querystring } = ctx;
     const shop = query.shop ? query.shop.toString() : "";
+    const authUrl = `${authRoute}?${querystring}`;
 
     // Login again if the shops don't match
     if (session && shop && session.shop !== shop) {
       await clearSession(ctx, accessMode);
-      const redirectUrl = getAuthUrl(authRoute, shop);
-      ctx.redirect(redirectUrl);
+      ctx.redirect(authUrl);
       return;
     }
 
@@ -89,12 +85,10 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       } else if (Shopify.Context.IS_EMBEDDED_APP) {
         shop = getShopFromAuthHeader(ctx); // Get shop from auth header
       }
-      const reauthUrl = getAuthUrl(authRoute, shop);
-      ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
+      ctx.response.set(REAUTH_URL_HEADER, authUrl); // Set the reauth url header
     } else {
       // Otherwise redirect to the auth page
-      const redirectUrl = getAuthUrl(authRoute, shop);
-      ctx.redirect(redirectUrl);
+      ctx.redirect(authUrl);
     }
   };
 }

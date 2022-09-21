@@ -88,6 +88,7 @@ server.use(
     authPath: "/install/auth",
     async afterAuth(ctx) {
       const { shop, accessToken } = ctx.state.shopify;
+      const { host } = ctx.query;
       if (!accessToken) {
         // This can happen if the browser interferes with the auth flow
         ctx.response.status = 500;
@@ -95,7 +96,7 @@ server.use(
         return;
       }
       // Redirect to user auth endpoint, to get user's online token
-      ctx.redirect(`/auth?shop=${shop}`);
+      ctx.redirect(`/auth?shop=${shop}&host=${host}`);
     },
   })
 );
@@ -107,14 +108,15 @@ server.use(
     authPath: "/auth",
     async afterAuth(ctx) {
       const { shop } = ctx.state.shopify;
+      const { host } = ctx.query;
       // Check if the app is installed
       // NOTE: You can replace with your own function to check if the shop is installed, or you can just remove it, but this is an extra check that can help prevent auth issues
       if (isShopActive(shop)) {
         // Redirect to app
-        ctx.redirect(`/?shop=${shop}`);
+        ctx.redirect(`/?shop=${shop}&host=${host}`);
       } else {
         // Redirect to installation endpoint to get permanent access token
-        ctx.redirect(`/install/auth/?shop=${shop}`);
+        ctx.redirect(`/install/auth/?shop=${shop}&host=${host}`);
       }
     },
   })

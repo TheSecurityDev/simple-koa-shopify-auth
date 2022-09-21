@@ -41,7 +41,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
 
   // This executes for every request
   return async function shopifyAuthMiddleware(ctx: Context, next: Next) {
-    const { cookies, query, path } = ctx;
+    const { cookies, query, querystring, path } = ctx;
     const shop = query.shop ? query.shop.toString() : "";
 
     cookies.secure = true;
@@ -93,7 +93,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
           case err instanceof Shopify.Errors.CookieNotFound:
           case err instanceof Shopify.Errors.SessionNotFound:
             // This is likely because the OAuth session cookie expired before the merchant approved the request
-            ctx.redirect(`${oAuthStartPath}?shop=${shop}`);
+            ctx.redirect(`${oAuthStartPath}?${querystring}`);
             break;
           case err instanceof Shopify.Errors.InvalidJwtError:
             ctx.throw(401, err.message);
