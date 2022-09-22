@@ -47,8 +47,8 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
     if (session) {
       // Verify session is valid
-      if (session.isActive()) {
-        try {
+      try {
+        if (session.isActive()) {
           // I think we need to verify on Shopify's side that the access token is valid, because otherwise anyone could just make their own 'valid' token and use it.
           //   Of course if we're making requests to Shopify's API afterwords it will fail with an error, but we still need this check since we aren't always making a Shopify request when verifying this token (it might be an API request for our server, and we need to be sure it's the correct user).
           // Make a request to make sure the token is valid on Shopify's end. If not, we'll get a 401 and have to re-authorize.
@@ -57,20 +57,26 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
           setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
           await next();
           return;
-        } catch (err) {
-          if (
-            err instanceof HttpResponseError &&
-            ((err as any)?.code === 401 || err.response?.code === 401) // Shopify API v3+ uses 'response.code' instead of 'code'
-          ) {
-            // Session not valid, we will re-authorize
-          } else {
-            throw err;
-          }
+        }
+      } catch (err) {
+        if (
+          err instanceof HttpResponseError &&
+          ((err as any)?.code === 401 || err.response?.code === 401) // Shopify API v3+ uses 'response.code' instead of 'code'
+        ) {
+          // Session not valid, we will re-authorize
+        } else if (
+          err instanceof Shopify.Errors.InvalidJwtError ||
+          err instanceof Shopify.Errors.MissingJwtTokenError
+        ) {
+          // Invalid JWT session token, we will re-authorize (I don't know for sure if this error is thrown here)
+          console.warn("JWT token error in verifyRequest: " + err.message);
+        } else {
+          throw err;
         }
       }
     }
 
-    // If we get here, either the session is invalid or we need to re-authorize
+    // ! If we get here, either the session is invalid or we need to re-authorize
 
     // We need to re-authenticate
     if (returnHeader) {
@@ -79,10 +85,20 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       ctx.response.set(REAUTH_HEADER, "1"); // Tell the client to re-authorize by setting the reauth header
       // Get the shop from the session, or the auth header (we can't get it from the query if we're making a post request)
       let reauthUrl = authRoute;
-      if (Shopify.Context.IS_EMBEDDED_APP) {
-        reauthUrl += `?${getShopAndHostQueryStringFromAuthHeader(ctx)}`;
-      } else if (session?.shop) {
-        reauthUrl += `?shop=${session.shop}`; // This won't have the host param, which probably won't work (but this library is meant for embedded apps, so it's not a big deal; do non-embedded apps even need the host param?)
+      try {
+        if (Shopify.Context.IS_EMBEDDED_APP) {
+          reauthUrl += `?${getShopAndHostQueryStringFromAuthHeader(ctx)}`;
+        } else {
+          reauthUrl += `?${new URL(ctx.header.referer).search}`; // Get parameters from the referer header (not completely sure if this will work)
+        }
+      } catch (err) {
+        if (
+          err instanceof Shopify.Errors.InvalidJwtError ||
+          err instanceof Shopify.Errors.MissingJwtTokenError
+        ) {
+          console.warn("JWT token error in verifyRequest: " + err.message);
+        }
+        throw err;
       }
       ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
     } else {
