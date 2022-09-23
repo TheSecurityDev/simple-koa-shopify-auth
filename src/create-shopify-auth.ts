@@ -34,11 +34,6 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
   const oAuthCallbackPath = `${oAuthStartPath}/callback`;
   const inlineOAuthPath = `${oAuthStartPath}/inline`;
 
-  const topLevelOAuthRedirect = createTopLevelOAuthRedirect(
-    Shopify.Context.API_KEY,
-    inlineOAuthPath
-  );
-
   // This executes for every request
   return async function shopifyAuthMiddleware(ctx: Context, next: Next) {
     const { cookies, query, querystring, path } = ctx;
@@ -69,6 +64,10 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
     }
 
     if (path === oAuthStartPath) {
+      const topLevelOAuthRedirect = createTopLevelOAuthRedirect(
+        Shopify.Context.API_KEY,
+        inlineOAuthPath
+      );
       await topLevelOAuthRedirect(ctx);
       return;
     }
