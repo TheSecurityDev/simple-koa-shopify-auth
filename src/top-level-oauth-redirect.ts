@@ -8,6 +8,10 @@ export const TOP_LEVEL_OAUTH_COOKIE_NAME = "shopifyTopLevelOAuth"; // If this is
 const RELATIVE_APP_BRIDGE_PATH = "../app-bridge/app-bridge@3.2.6.js";
 const APP_BRIDGE_FILE_PATH = resolvePath(__dirname, RELATIVE_APP_BRIDGE_PATH); // Get global path from relative path to this module
 
+export function shouldPerformTopLevelOAuth({ cookies }: Context) {
+  return Boolean(cookies.get(TOP_LEVEL_OAUTH_COOKIE_NAME));
+}
+
 export function setTopLevelOAuthCookieValue(ctx: Context, value: string) {
   ctx.cookies.set(
     TOP_LEVEL_OAUTH_COOKIE_NAME,
@@ -27,30 +31,22 @@ function getCookieOptions(ctx: Context) {
   return cookieOptions;
 }
 
-export function createTopLevelOAuthRedirect(apiKey: string, path: string) {
-  const redirect = createTopLevelRedirect(apiKey, path);
-  return async function topLevelOAuthRedirect(ctx: Context) {
-    setTopLevelOAuthCookieValue(ctx, "1");
-    await redirect(ctx);
-  };
+export async function startTopLevelOauthRedirect(ctx: Context, apiKey: string, path: string) {
+  setTopLevelOAuthCookieValue(ctx, "1");
+  let { query } = ctx;
+  const hostName = Shopify.Context.HOST_NAME; // Use this instead of ctx.host to prevent issues when behind a proxy
+  const shop = query.shop ? query.shop.toString() : "";
+  const host = query.host ? query.host.toString() : "";
+  const params = { shop, host };
+  const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.querystring, because it sanitizes the query parameters we are using
+  ctx.body = await getTopLevelRedirectScript(
+    host,
+    `https://${hostName}${path}?${queryString}`,
+    apiKey
+  );
 }
 
-export function createTopLevelRedirect(apiKey: string, path: string) {
-  return async function topLevelRedirect(ctx: Context) {
-    let { query } = ctx;
-    const hostName = Shopify.Context.HOST_NAME; // Use this instead of ctx.host to prevent issues when behind a proxy
-    const shop = query.shop ? query.shop.toString() : "";
-    const params = { shop };
-    const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.querystring, because it sanitizes the query parameters we are using
-    ctx.body = await getTopLevelRedirectScript(
-      shop,
-      `https://${hostName}${path}?${queryString}`,
-      apiKey
-    );
-  };
-}
-
-async function getTopLevelRedirectScript(origin: string, redirectTo: string, apiKey: string) {
+async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKey: string) {
   // We used to load the script from unpkg.com, but that sometimes was too slow, so we are now loading the script file directly and injecting the code.
   const appBridgeScript = await readFile(APP_BRIDGE_FILE_PATH);
   return `
@@ -68,7 +64,7 @@ async function getTopLevelRedirectScript(origin: string, redirectTo: string, api
           var Redirect = AppBridge.actions.Redirect;
           var app = createApp({
             apiKey: "${apiKey}",
-            shopOrigin: "${encodeURI(origin)}",
+            host: "${encodeURI(host)}",
           });
           var redirect = Redirect.create(app);
           redirect.dispatch(Redirect.Action.REMOTE, "${redirectTo}");

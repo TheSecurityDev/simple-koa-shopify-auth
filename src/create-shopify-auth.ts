@@ -2,9 +2,9 @@ import Shopify, { AuthQuery } from "@shopify/shopify-api";
 import { Context, Next } from "koa";
 
 import {
-  createTopLevelOAuthRedirect,
-  TOP_LEVEL_OAUTH_COOKIE_NAME,
   setTopLevelOAuthCookieValue,
+  shouldPerformTopLevelOAuth,
+  startTopLevelOauthRedirect,
 } from "./top-level-oauth-redirect";
 
 type OAuthBeginConfig = {
@@ -12,10 +12,6 @@ type OAuthBeginConfig = {
   authPath?: string;
   afterAuth(ctx: Context): Promise<void>;
 };
-
-function shouldPerformInlineOAuth({ cookies }: Context) {
-  return Boolean(cookies.get(TOP_LEVEL_OAUTH_COOKIE_NAME));
-}
 
 export default function createShopifyAuth(options: OAuthBeginConfig) {
   const config: OAuthBeginConfig = {
@@ -32,7 +28,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
   }
 
   const oAuthCallbackPath = `${oAuthStartPath}/callback`;
-  const inlineOAuthPath = `${oAuthStartPath}/inline`;
+  const topLevelOAuthPath = `${oAuthStartPath}/toplevel`;
 
   // This executes for every request
   return async function shopifyAuthMiddleware(ctx: Context, next: Next) {
@@ -41,7 +37,10 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
 
     cookies.secure = true;
 
-    if (path === inlineOAuthPath || (path === oAuthStartPath && shouldPerformInlineOAuth(ctx))) {
+    if (
+      path === topLevelOAuthPath ||
+      (path === oAuthStartPath && shouldPerformTopLevelOAuth(ctx))
+    ) {
       // Auth started
       if (!validateShop(shop)) {
         // Invalid shop
@@ -50,7 +49,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
         return;
       }
 
-      // Begin auth process (redirect to Shopify for inline auth)
+      // Begin auth process (redirect to Shopify auth page)
       setTopLevelOAuthCookieValue(ctx, "");
       const redirectUrl = await Shopify.Auth.beginAuth(
         ctx.req,
@@ -59,17 +58,11 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
         oAuthCallbackPath,
         config.accessMode === "online"
       );
-      ctx.redirect(redirectUrl);
-      return;
+      return ctx.redirect(redirectUrl);
     }
 
     if (path === oAuthStartPath) {
-      const topLevelOAuthRedirect = createTopLevelOAuthRedirect(
-        Shopify.Context.API_KEY,
-        inlineOAuthPath
-      );
-      await topLevelOAuthRedirect(ctx);
-      return;
+      return await startTopLevelOauthRedirect(ctx, Shopify.Context.API_KEY, topLevelOAuthPath);
     }
 
     if (path === oAuthCallbackPath) {
@@ -81,7 +74,6 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
           query as unknown as AuthQuery
         );
         ctx.state.shopify = session;
-
         if (config.afterAuth) {
           await config.afterAuth(ctx);
         }
