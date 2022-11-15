@@ -47,6 +47,15 @@ export async function startTopLevelOauthRedirect(ctx: Context, apiKey: string, p
 }
 
 async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKey: string) {
+  let shopName = "";
+  try {
+    const decodedHost = Buffer.from(host, "base64").toString("utf8");
+    const shopFromOldHost = decodedHost.match(/([\w-]*).myshopify.com\/admin/);
+    const shopFromNewHost = decodedHost.match(/admin.shopify.com\/store\/([\w-]*)/);
+    shopName = shopFromNewHost ? shopFromNewHost[1] : shopFromOldHost ? shopFromOldHost[1] : "";
+  } catch (error) {
+    console.error("Error decoding host", error);
+  }
   // We used to load the script from unpkg.com, but that sometimes was too slow, so we are now loading the script file directly and injecting the code.
   const appBridgeScript = await readFile(APP_BRIDGE_FILE_PATH);
   return `
@@ -54,20 +63,38 @@ async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKe
     <script type="text/javascript">${appBridgeScript}</script>
     <script type="text/javascript">
       document.addEventListener('DOMContentLoaded', function() {
+        const apiKey = '${apiKey}';
+        const redirectUrl = '${redirectTo}';
         if (window.top === window.self) {
           // If the current window is the 'parent', change the URL by setting location.href
-          window.location.href = "${redirectTo}";
+          window.location.href = redirectUrl;
         } else {
           // If the current window is the 'child', change the parent's URL with postMessage
           var AppBridge = window['app-bridge'];
           var createApp = AppBridge.default;
           var Redirect = AppBridge.actions.Redirect;
-          var app = createApp({
-            apiKey: "${apiKey}",
-            host: "${encodeURI(host)}",
-          });
-          var redirect = Redirect.create(app);
-          redirect.dispatch(Redirect.Action.REMOTE, "${redirectTo}");
+          try {
+            var app = createApp({
+              apiKey,
+              host: "${encodeURI(host)}",
+            });
+            var redirect = Redirect.create(app);
+            redirect.dispatch(Redirect.Action.REMOTE, redirectUrl);
+          } catch (e) {
+            console.error(e);
+          }
+          try {
+            // For some reason, we get the old host parameter sometimes when using the new admin.shopify.com domain, and this causes issues with the redirect.
+            // So we will create a second redirect using the new host, just in case.
+            var app = createApp({
+              apiKey,
+              host: "${encodeURI(btoa(`admin.shopify.com/store/${shopName}`))}",
+            });
+            var redirect = Redirect.create(app);
+            redirect.dispatch(Redirect.Action.REMOTE, redirectUrl);
+          } catch (e) {
+            console.error(e);
+          }
         }
       });
     </script>
