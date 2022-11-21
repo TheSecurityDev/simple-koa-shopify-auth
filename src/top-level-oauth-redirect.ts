@@ -88,7 +88,7 @@ async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKe
             // So we will create a second redirect using the new host, just in case.
             var app = createApp({
               apiKey,
-              host: "${encodeURI(btoa(`admin.shopify.com/store/${shopName}`))}",
+              host: encodeURI(btoa("admin.shopify.com/store/" + "${shopName}")),
             });
             var redirect = Redirect.create(app);
             redirect.dispatch(Redirect.Action.REMOTE, redirectUrl);
