@@ -65,6 +65,10 @@ async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKe
       document.addEventListener('DOMContentLoaded', function() {
         const apiKey = '${apiKey}';
         const redirectUrl = '${redirectTo}';
+        const host = '${encodeURI(host)}';
+        const hostManual = '${encodeURI(
+          Buffer.from(`admin.shopify.com/store/${shopName}`, "utf8").toString("base64")
+        )}'; // This is the manual host that we use to redirect to the new admin
         if (window.top === window.self) {
           // If the current window is the 'parent', change the URL by setting location.href
           window.location.href = redirectUrl;
@@ -74,9 +78,9 @@ async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKe
           var createApp = AppBridge.default;
           var Redirect = AppBridge.actions.Redirect;
           try {
-            var app = createApp({
+            var app = createApp({ 
               apiKey,
-              host: "${encodeURI(host)}",
+              host
             });
             var redirect = Redirect.create(app);
             redirect.dispatch(Redirect.Action.REMOTE, redirectUrl);
@@ -84,14 +88,16 @@ async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKe
             console.error(e);
           }
           try {
-            // For some reason, we get the old host parameter sometimes when using the new admin.shopify.com domain, and this causes issues with the redirect.
-            // So we will create a second redirect using the new host, just in case.
-            var app = createApp({
-              apiKey,
-              host: encodeURI(btoa("admin.shopify.com/store/" + "${shopName}")),
-            });
-            var redirect = Redirect.create(app);
-            redirect.dispatch(Redirect.Action.REMOTE, redirectUrl);
+            if (atob(host) !== atob(hostManual)) {
+              // For some reason, we get the old host parameter sometimes when using the new admin.shopify.com domain, and this causes issues with the redirect.
+              // So we will create a second redirect using the new host, just in case.
+              var app = createApp({
+                apiKey,
+                host: hostManual
+              });
+              var redirect = Redirect.create(app);
+              redirect.dispatch(Redirect.Action.REMOTE, redirectUrl);
+            }
           } catch (e) {
             console.error(e);
           }
