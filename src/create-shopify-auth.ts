@@ -21,7 +21,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
   };
 
   const { authPath: oAuthStartPath } = config;
-  if (!oAuthStartPath.startsWith("/") || oAuthStartPath.endsWith("/")) {
+  if (!oAuthStartPath?.startsWith("/") || oAuthStartPath?.endsWith("/")) {
     throw new Error(
       `Invalid auth path: '${oAuthStartPath}'. Must be a relative path without a trailing slash (eg. '/auth').`
     );
@@ -78,18 +78,19 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
           await config.afterAuth(ctx);
         }
       } catch (err) {
+        const message = (err as Error).message;
         switch (true) {
           case err instanceof Shopify.Errors.InvalidOAuthError:
-            ctx.throw(400, err.message);
+            ctx.throw(400, message);
           case err instanceof Shopify.Errors.CookieNotFound:
           case err instanceof Shopify.Errors.SessionNotFound:
             // This is likely because the OAuth session cookie expired before the merchant approved the request
             ctx.redirect(`${oAuthStartPath}?${querystring}`);
             break;
           case err instanceof Shopify.Errors.InvalidJwtError:
-            ctx.throw(401, err.message);
+            ctx.throw(401, message);
           default:
-            ctx.throw(500, err.message);
+            ctx.throw(500, message);
         }
       }
       return;

@@ -78,11 +78,11 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         ctx.response.status = 401;
         ctx.response.set(REAUTH_HEADER, "1"); // Tell the client to re-authorize by setting the reauth header
         // Get the shop from the session, or the auth header (we can't get it from the query if we're making a post request)
-        let reauthUrl = authRoute;
+        let reauthUrl = authRoute ?? "";
         if (Shopify.Context.IS_EMBEDDED_APP) {
           reauthUrl += `?${getShopAndHostQueryStringFromAuthHeader(ctx)}`;
         } else {
-          reauthUrl += `?${new URL(ctx.header.referer).search}`; // Get parameters from the referer header (not completely sure if this will work)
+          reauthUrl += `?${new URL(ctx.header.referer ?? "").search}`; // Get parameters from the referer header (not completely sure if this will work)
         }
         ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
       } else {
@@ -141,8 +141,8 @@ async function checkSessionOnShopifyAPI(session: Session) {
   }
 }
 
-function getShopAndHostQueryStringFromAuthHeader(ctx: Context): string {
-  const authHeader: string = ctx.req.headers.authorization;
+function getShopAndHostQueryStringFromAuthHeader(ctx: Context): string | null {
+  const authHeader: string = ctx.req.headers.authorization ?? "";
   const matches = authHeader?.match(/Bearer (.*)/);
   if (matches) {
     const payload = Shopify.Utils.decodeSessionToken(matches[1]);

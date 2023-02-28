@@ -12,7 +12,7 @@ export function shouldPerformTopLevelOAuth({ cookies }: Context) {
   return Boolean(cookies.get(TOP_LEVEL_OAUTH_COOKIE_NAME));
 }
 
-export function setTopLevelOAuthCookieValue(ctx: Context, value: string) {
+export function setTopLevelOAuthCookieValue(ctx: Context, value: string | null) {
   ctx.cookies.set(
     TOP_LEVEL_OAUTH_COOKIE_NAME,
     value,
