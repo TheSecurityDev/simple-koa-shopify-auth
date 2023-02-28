@@ -49,8 +49,18 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       if (session && session.isActive()) {
         // There's no need to check the access token by calling the API, because the JWT token expires after 1 minute, so the only way we can be here is if Shopify gave the user a valid JWT token.
         setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
-        await next();
-        return;
+        try {
+          await next();
+          return;
+        } catch (err) {
+          // If there's an error handling the request, we will check if it's a 401 http response error, and if so, we will re-authorize
+          const code = err?.code || err?.response?.code;
+          if (code === 401) {
+            // We need to re-authorize
+          } else {
+            throw err;
+          }
+        }
       }
 
       // ! If we get here then the session was not valid and we need to re-authorize
