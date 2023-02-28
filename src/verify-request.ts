@@ -2,7 +2,7 @@ import Shopify from "@shopify/shopify-api";
 import { Session } from "@shopify/shopify-api/dist/auth/session";
 import { HttpResponseError } from "@shopify/shopify-api/dist/error";
 import { Context, Next } from "koa";
-import LRUCache from "lru-cache";
+import LRUCache = require("lru-cache");
 
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
 

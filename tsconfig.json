@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": false // WARNING: Enabling this allows importing from modules that don't have a default export, which breaks some projects using this library
   },
   "include": ["src/**/*"]
 }
