@@ -54,6 +54,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
           return;
         } catch (err) {
           // If there's an error handling the request, we will check if it's a 401 http response error, and if so, we will re-authorize
+          // This allows you to throw a 401 error from your app, and have it re-authorize the user
           const code = err?.code || err?.response?.code;
           if (code === 401) {
             // We need to re-authorize
