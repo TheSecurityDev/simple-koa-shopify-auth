@@ -1,6 +1,5 @@
 import Shopify from "@shopify/shopify-api";
 import { Session } from "@shopify/shopify-api/dist/auth/session";
-import { HttpResponseError } from "@shopify/shopify-api/dist/error";
 import { Context, Next } from "koa";
 
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
@@ -28,6 +27,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
   return async function verifyTokenMiddleware(ctx: Context, next: Next) {
     try {
+      // Load the current session (this will validate the JWT signature, so we know that the token was signed by Shopify)
       const sessionData = await Shopify.Utils.loadCurrentSession(
         ctx.req,
         ctx.res,
@@ -46,34 +46,14 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         return;
       }
 
-      if (session) {
-        // Verify session is valid
-        try {
-          if (session.isActive()) {
-            // I think we need to verify on Shopify's side that the access token is valid, because otherwise anyone could just make their own 'valid' token and use it.
-            //   Of course if we're making requests to Shopify's API afterwords it will fail with an error, but we still need this check since we aren't always making a Shopify request when verifying this token (it might be an API request for our server, and we need to be sure it's the correct user).
-            // Make a request to make sure the token is valid on Shopify's end. If not, we'll get a 401 and have to re-authorize.
-            const client = new Shopify.Clients.Rest(session.shop, session.accessToken);
-            await client.get({ path: "shop" }); // Fetch /shop route on Shopify to verify the token is valid
-            setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
-            await next();
-            return;
-          }
-        } catch (err) {
-          if (
-            err instanceof HttpResponseError &&
-            ((err as any)?.code === 401 || err.response?.code === 401) // Shopify API v3+ uses 'response.code' instead of 'code'
-          ) {
-            // Session not valid, we will re-authorize
-          } else {
-            throw err;
-          }
-        }
+      if (session && session.isActive()) {
+        // There's no need to check the access token by calling the API, because the JWT token expires after 1 minute, so the only way we can be here is if Shopify gave the user a valid JWT token.
+        setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
+        await next();
+        return;
       }
 
-      // ! If we get here, either the session is invalid or we need to re-authorize
-
-      // We need to re-authenticate
+      // ! If we get here then the session was not valid and we need to re-authorize
       if (returnHeader) {
         // Return a header to the client so they can re-authorize
         ctx.response.status = 401;
