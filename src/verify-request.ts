@@ -1,6 +1,8 @@
 import Shopify from "@shopify/shopify-api";
 import { Session } from "@shopify/shopify-api/dist/auth/session";
+import { HttpResponseError } from "@shopify/shopify-api/dist/error";
 import { Context, Next } from "koa";
+import LRUCache from "lru-cache";
 
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
 
@@ -46,25 +48,31 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         return;
       }
 
-      if (session && session.isActive()) {
-        // There's no need to check the access token by calling the API, because the JWT token expires after 1 minute, so the only way we can be here is if Shopify gave the user a valid JWT token.
-        setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
+      if (session) {
+        // Verify session is valid
         try {
-          await next();
-          return;
+          if (session.isActive()) {
+            checkSessionOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
+            // If we get here, the session is valid
+            setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
+            await next();
+            return;
+          }
         } catch (err) {
-          // If there's an error handling the request, we will check if it's a 401 http response error, and if so, we will re-authorize
-          // This allows you to throw a 401 error from your app, and have it re-authorize the user
-          const code = err?.code || err?.response?.code;
-          if (code === 401) {
-            // We need to re-authorize
+          if (
+            err instanceof HttpResponseError &&
+            ((err as any)?.code === 401 || err.response?.code === 401) // Shopify API v3+ uses 'response.code' instead of 'code'
+          ) {
+            // Session not valid, we will re-authorize
           } else {
             throw err;
           }
         }
       }
 
-      // ! If we get here then the session was not valid and we need to re-authorize
+      // ! If we get here, either the session is invalid or we need to re-authorize
+
+      // We need to re-authenticate
       if (returnHeader) {
         // Return a header to the client so they can re-authorize
         ctx.response.status = 401;
@@ -110,6 +118,26 @@ async function clearSession(ctx: Context, accessMode = defaultOptions.accessMode
     } else {
       throw error;
     }
+  }
+}
+
+const VERIFY_TOKEN_REQUEST_CACHE = new LRUCache({
+  max: 1000,
+  maxAge: 1000 * 60 * 60, // 1 hour
+}); // Cache the results of the verify access token request
+
+async function checkSessionOnShopifyAPI(session: Session) {
+  const { shop, accessToken } = session;
+  // Theoretically there's no need to check the access token by calling the API, because the JWT token expires after 1 minute, so the only way we can be here is if Shopify gave the user a valid JWT token.
+  // However, in case the access token has been corrupted in the database or something, we should check it at least once by calling the API.
+  // We can cache the result of this call so we don't have to call it every time, since it's really only needed once.
+  const cacheKey = `${shop}:${accessToken}`;
+  if (!VERIFY_TOKEN_REQUEST_CACHE.get(cacheKey)) {
+    // We haven't verified this access token yet, so make a request to make sure the token is valid on Shopify's end.
+    // If it's not valid, we'll get a 401 and have to re-authorize.
+    const client = new Shopify.Clients.Rest(shop, accessToken);
+    await client.get({ path: "shop" }); // Fetch /shop route on Shopify to verify the token is valid
+    VERIFY_TOKEN_REQUEST_CACHE.set(cacheKey, true); // Cache the result
   }
 }
 
