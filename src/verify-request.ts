@@ -52,7 +52,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         // Verify session is valid
         try {
           if (session.isActive()) {
-            checkSessionOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
+            await checkSessionOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
             // If we get here, the session is valid
             setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
             await next();
