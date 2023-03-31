@@ -121,10 +121,12 @@ async function clearSession(ctx: Context, accessMode = defaultOptions.accessMode
   }
 }
 
+// Cache the results of the verify access token request
 const VERIFY_TOKEN_REQUEST_CACHE = new LRUCache({
   max: 1000,
-  maxAge: 1000 * 60 * 60, // 1 hour
-}); // Cache the results of the verify access token request
+  ttl: 1000 * 60 * 60, // 1 hour
+  // Don't use the fetchMethod, because we want to catch errors and I think it might handle the error without throwing
+});
 
 async function checkSessionOnShopifyAPI(session: Session) {
   const { shop, accessToken } = session;
@@ -134,7 +136,7 @@ async function checkSessionOnShopifyAPI(session: Session) {
   const cacheKey = `${shop}:${accessToken}`;
   if (!VERIFY_TOKEN_REQUEST_CACHE.get(cacheKey)) {
     // We haven't verified this access token yet, so make a request to make sure the token is valid on Shopify's end.
-    // If it's not valid, we'll get a 401 and have to re-authorize.
+    // If it's not valid, it will throw a 401 error and have to re-authorize.
     const client = new Shopify.Clients.Rest(shop, accessToken);
     await client.get({ path: "shop" }); // Fetch /shop route on Shopify to verify the token is valid
     VERIFY_TOKEN_REQUEST_CACHE.set(cacheKey, true); // Cache the result

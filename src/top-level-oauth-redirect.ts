@@ -8,6 +8,8 @@ export const TOP_LEVEL_OAUTH_COOKIE_NAME = "shopifyTopLevelOAuth"; // If this is
 const RELATIVE_APP_BRIDGE_PATH = "../app-bridge/app-bridge@3.2.6.js";
 const APP_BRIDGE_FILE_PATH = resolvePath(__dirname, RELATIVE_APP_BRIDGE_PATH); // Get global path from relative path to this module
 
+// NOTE: Top level means we're in the top level window, not embedded in an iframe
+
 export function shouldPerformTopLevelOAuth({ cookies }: Context) {
   return Boolean(cookies.get(TOP_LEVEL_OAUTH_COOKIE_NAME));
 }
@@ -46,6 +48,7 @@ export async function startTopLevelOauthRedirect(ctx: Context, apiKey: string, p
   );
 }
 
+// TODO: We should refactor this ugly mess and remove the parts we don't need anymore.
 async function getTopLevelRedirectScript(host: string, redirectTo: string, apiKey: string) {
   let shopName = "";
   try {
