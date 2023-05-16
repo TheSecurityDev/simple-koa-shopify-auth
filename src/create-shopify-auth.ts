@@ -62,7 +62,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
     }
 
     if (path === oAuthStartPath) {
-      return await startTopLevelOauthRedirect(ctx, Shopify.Context.API_KEY, topLevelOAuthPath);
+      return startTopLevelOauthRedirect(ctx, Shopify.Context.API_KEY, topLevelOAuthPath);
     }
 
     if (path === oAuthCallbackPath) {

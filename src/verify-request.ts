@@ -2,7 +2,7 @@ import Shopify from "@shopify/shopify-api";
 import { Session } from "@shopify/shopify-api/dist/auth/session";
 import { HttpResponseError } from "@shopify/shopify-api/dist/error";
 import { Context, Next } from "koa";
-import LRUCache = require("lru-cache");
+import { LRUCache } from "lru-cache";
 
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
 
@@ -55,8 +55,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
             await checkSessionOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
             // If we get here, the session is valid
             setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
-            await next();
-            return;
+            return next();
           }
         } catch (err) {
           if (
