@@ -29,13 +29,13 @@
     "prepublish": "npm run build"
   },
   "dependencies": {
-    "lru-cache": "^9.1.1"
+    "lru-cache": "^9.1.2"
   },
   "peerDependencies": {
     "@shopify/shopify-api": "^5.0.1"
   },
   "devDependencies": {
-    "@types/koa": "^2.13.4",
-    "typescript": "^4.8.3"
+    "@types/koa": "^2.14.0",
+    "typescript": "^4.9.5"
   }
 }
