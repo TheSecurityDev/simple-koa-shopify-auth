@@ -2,9 +2,19 @@
 
 https://www.npmjs.com/package/simple-koa-shopify-auth
 
-#### NOTE: This package is not maintained by or affiliated with Shopify.
+##### This package is not maintained by or affiliated with Shopify.
 
-#### ⚠️ This package only works with `@shopify/shopify-api` v5.x. v6.x+ is not supported, see https://github.com/TheSecurityDev/simple-koa-shopify-auth/issues/14 ⚠️
+---
+
+#### ⚠️ This package should be considered DEPRECATED, due to improvements with how apps are installed and authenticated that will make it unnecessary in the future.
+
+See https://shopify.dev/docs/apps/auth/installation and https://shopify.dev/docs/apps/auth/get-access-tokens/token-exchange for more information.
+
+#### ⚠️ Also, this package only works with `@shopify/shopify-api` v5, and there are no plans to support v6+ currently.
+
+See https://github.com/TheSecurityDev/simple-koa-shopify-auth/issues/14.
+
+---
 
 ## Description:
 
