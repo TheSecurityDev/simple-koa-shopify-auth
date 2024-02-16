@@ -110,7 +110,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         ctx.response.status = 401;
         ctx.response.set(REAUTH_HEADER, "1"); // Tell the client to re-authorize by setting the reauth header
         // Construct the shop and host params from the session token (we can't get it from the query if we're making a post request)
-        const reauthUrl = `${authRoute ?? ""}${getShopAndHostQueryStringFromSessionToken(
+        const reauthUrl = `${authRoute ?? ""}?${getShopAndHostQueryStringFromSessionToken(
           sessionToken
         )}`;
         ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
