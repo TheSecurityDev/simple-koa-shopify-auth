@@ -16,9 +16,10 @@ type VerifyRequestOptions = {
   accessMode?: "online" | "offline";
   returnHeader?: boolean;
   authRoute?: string;
+  afterSessionRefresh?: (ctx: Context, session: Session) => Promise<void>;
 };
 
-const defaultOptions: Required<VerifyRequestOptions> = {
+const defaultOptions: Omit<Required<VerifyRequestOptions>, "afterSessionRefresh"> = {
   accessMode: "online",
   authRoute: "/auth",
   returnHeader: false,
@@ -28,7 +29,10 @@ const REAUTH_HEADER = "X-Shopify-API-Request-Failure-Reauthorize";
 const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
 
 export default function verifyRequest(options?: VerifyRequestOptions) {
-  const { accessMode, returnHeader, authRoute } = { ...defaultOptions, ...options };
+  const { accessMode, returnHeader, authRoute, afterSessionRefresh } = {
+    ...defaultOptions,
+    ...options,
+  };
 
   return async function verifyTokenMiddleware(ctx: Context, next: Next) {
     try {
@@ -59,9 +63,8 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         // Verify session is valid
         try {
           if (session.isActive()) {
-            await checkAccessTokenOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
-            // If we get here, the session is valid, so we can continue to the next middleware
-            setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie (probably not needed, but just in case)
+            await checkAccessTokenOnShopifyAPI(session); // Check access token and throw a 401 error if it's invalid
+            setTopLevelOAuthCookieValue(ctx, null); // Clear the top level oauth cookie since we have a valid session
             return next(); // Continue to the next middleware since the session is valid
           }
         } catch (err) {
@@ -90,8 +93,11 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         if (session.isActive()) {
           // Save the new session
           await Shopify.Utils.storeSession(session);
+          // Call the afterSessionRefresh callback if provided
+          await afterSessionRefresh?.(ctx, session);
+          // Clear the top level oauth cookie since we have a valid session (maybe not necessary, but just in case)
+          setTopLevelOAuthCookieValue(ctx, null);
           // Continue to the next middleware since the session is valid
-          setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie (probably not needed, but just in case)
           return next();
         } else {
           console.warn(
