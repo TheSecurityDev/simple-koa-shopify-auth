@@ -3,6 +3,14 @@ import { MissingJwtTokenError, HttpResponseError } from "@shopify/shopify-api/di
 import { JwtPayload } from "@shopify/shopify-api/dist/utils/decode-session-token";
 import { Context } from "koa";
 
+/** Return whether the shop matches the expected format.
+ * @deprecated You can use `Shopify.Utils.sanitizeShop` instead (returns `null` if invalid).
+ */
+export function validateShop(shop: string): boolean {
+  const shopUrlRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.(com|io)[/]*$/;
+  return shopUrlRegex.test(shop);
+}
+
 /** Throw the error, unless it's an `HttpResponseError` with status `401`. */
 export function throwUnlessAuthError(err: HttpResponseError | Error | unknown) {
   if (err instanceof HttpResponseError) {
