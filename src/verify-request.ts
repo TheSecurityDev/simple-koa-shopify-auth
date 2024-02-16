@@ -1,11 +1,9 @@
-import Shopify, { DataType } from "@shopify/shopify-api";
+import Shopify from "@shopify/shopify-api";
 import { Session } from "@shopify/shopify-api/dist/auth/session";
-import { HttpClient } from "@shopify/shopify-api/dist/clients/http_client/http_client";
-import { HttpResponseError } from "@shopify/shopify-api/dist/error";
-import { JwtPayload } from "@shopify/shopify-api/dist/utils/decode-session-token";
 import { Context, Next } from "koa";
 import { LRUCache } from "lru-cache";
 
+import { exchangeSessionTokenForAccessTokenSession } from "./token-exchange";
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
 import {
   getEncodedSessionToken,
@@ -20,7 +18,7 @@ type VerifyRequestOptions = {
   authRoute?: string;
 };
 
-const defaultOptions: VerifyRequestOptions = {
+const defaultOptions: Required<VerifyRequestOptions> = {
   accessMode: "online",
   authRoute: "/auth",
   returnHeader: false,
@@ -169,58 +167,4 @@ async function checkAccessTokenOnShopifyAPI(session: Session) {
     await client.get({ path: "shop" }); // Fetch /shop route on Shopify to verify the token is valid
     VERIFY_TOKEN_REQUEST_CACHE.set(cacheKey, true); // Cache the result
   }
-}
-
-/** Given the shop, encoded JWT session token, and token type, return a session object with an access token.
-    https://shopify.dev/docs/apps/auth/get-access-tokens/token-exchange */
-async function exchangeSessionTokenForAccessTokenSession(
-  shop: string,
-  encodedSessionToken: string,
-  tokenType?: "online" | "offline"
-) {
-  tokenType = tokenType ?? defaultOptions.accessMode;
-
-  console.log(`Exchanging session token for ${tokenType} access token for shop '${shop}'...`);
-
-  // Construct the request body
-  const body = {
-    client_id: Shopify.Context.API_KEY,
-    client_secret: Shopify.Context.API_SECRET_KEY,
-    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-    subject_token: encodedSessionToken,
-    subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
-    requested_token_type: `urn:shopify:params:oauth:token-type:${tokenType}-access-token`,
-  };
-
-  // Make the request
-  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: "POST",
-    body: JSON.stringify(body),
-    headers: { "Content-Type": DataType.JSON, Accept: DataType.JSON },
-  });
-
-  // Check the response for errors
-  if (!response.ok) {
-    const { status, statusText, headers } = response;
-    throw new HttpResponseError({
-      message: `Failed to exchange session token for access token: ${status} ${statusText}`,
-      code: status,
-      statusText,
-      body,
-      headers: headers as any,
-    });
-  }
-
-  // Parse the response
-  const sessionResponse: Omit<Session, "id"> = await response.json(); // The returned session is missing the id, so we'll need to add it
-
-  // Get the new session id
-  const sessionId =
-    tokenType === "online"
-      ? `${shop}_${sessionResponse.onlineAccessInfo?.associated_user.id}`
-      : `offline_${shop}`;
-  console.log(`Got ${tokenType} access token for shop '${shop}' in session '${sessionId}'`);
-
-  // Create and return the new session object
-  return Session.cloneSession(sessionResponse as Session, sessionId);
 }
