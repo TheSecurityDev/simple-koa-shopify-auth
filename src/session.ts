@@ -6,9 +6,11 @@ export function createSession(responseBody: OnlineAccessResponse, shop: string, 
   const isOnline = !!rest.associated_user; // If there's an associated user, then it's an online access token
 
   // Get the session ID
-  const sessionId = isOnline
-    ? Shopify.Auth.getJwtSessionId(shop, `${rest.associated_user.id}`)
-    : Shopify.Auth.getOfflineSessionId(shop);
+  const sessionId = Shopify.Context.IS_EMBEDDED_APP
+    ? isOnline
+      ? Shopify.Auth.getJwtSessionId(shop, `${rest.associated_user.id}`)
+      : Shopify.Auth.getOfflineSessionId(shop)
+    : `${shop}_${Date.now()}`;
 
   // Initialize the session object
   const session = new Shopify.Session.Session(sessionId, shop, state, isOnline);
