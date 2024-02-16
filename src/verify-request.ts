@@ -32,11 +32,9 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
   const { accessMode, returnHeader, authRoute } = { ...defaultOptions, ...options };
 
   return async function verifyTokenMiddleware(ctx: Context, next: Next) {
-    // Get shop from query string
-    const { query, querystring } = ctx;
-    const shop = query.shop?.toString() ?? "";
-
     try {
+      const { query, querystring } = ctx;
+
       // Load the user's access token session (this will validate the JWT signature of the request session token, so we know that it was signed by Shopify)
       const sessionData = await Shopify.Utils.loadCurrentSession(
         ctx.req,
@@ -49,9 +47,10 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         const session = Session.cloneSession(sessionData, sessionData.id);
 
         // Login again if the shops don't match (not every request will have a shop query parameter, so only check if it's present)
-        if (shop && session.shop !== shop) {
+        const shopParam = query.shop?.toString() ?? "";
+        if (shopParam && session.shop !== shopParam) {
           console.warn(
-            `Shop '${shop}' does not match session shop '${session.shop}'. Redirecting to auth route...`
+            `Shop '${shopParam}' does not match session shop '${session.shop}'. Redirecting to auth route...`
           );
           await clearSession(ctx, accessMode);
           ctx.redirect(`${authRoute}?${querystring}`);

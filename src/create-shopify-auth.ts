@@ -6,7 +6,6 @@ import {
   shouldPerformTopLevelOAuth,
   startTopLevelOauthRedirect,
 } from "./top-level-oauth-redirect";
-import { validateShop } from "./utils";
 
 type OAuthBeginConfig = {
   accessMode?: "online" | "offline";
@@ -43,7 +42,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
       (path === oAuthStartPath && shouldPerformTopLevelOAuth(ctx))
     ) {
       // Auth started
-      if (!validateShop(shop)) {
+      if (!Shopify.Utils.sanitizeShop(shop)) {
         // Invalid shop
         ctx.response.status = 400;
         ctx.response.body = shop ? "Invalid shop parameter" : "Missing shop parameter";
