@@ -7,8 +7,9 @@ import { Context } from "koa";
 export function throwUnlessAuthError(err: HttpResponseError | Error | unknown) {
   if (err instanceof HttpResponseError) {
     // NOTE: Shopify API v3+ uses 'response.code' instead of 'code'
-    if ((err as any)?.code === 401 || err.response?.code === 401) {
-      return; // Catch the 401 error so we can re-authorize
+    const code = (err as any)?.code ?? err.response?.code;
+    if (code === 401 || code === 403) {
+      return; // Catch the 401 and 403 errors so we can re-authorize
     }
   }
   throw err; // Throw any other errors
