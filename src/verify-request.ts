@@ -1,10 +1,17 @@
 import Shopify from "@shopify/shopify-api";
 import { Session } from "@shopify/shopify-api/dist/auth/session";
-import { HttpResponseError } from "@shopify/shopify-api/dist/error";
+import { HttpClient } from "@shopify/shopify-api/dist/clients/http_client/http_client";
+import { JwtPayload } from "@shopify/shopify-api/dist/utils/decode-session-token";
 import { Context, Next } from "koa";
 import { LRUCache } from "lru-cache";
 
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
+import {
+  getEncodedSessionToken,
+  getShopFromSessionToken,
+  getShopAndHostQueryStringFromSessionToken,
+  throwUnlessAuthError,
+} from "./utils";
 
 type VerifyRequestOptions = {
   accessMode?: "online" | "offline";
@@ -22,88 +29,95 @@ const REAUTH_HEADER = "X-Shopify-API-Request-Failure-Reauthorize";
 const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
 
 export default function verifyRequest(options?: VerifyRequestOptions) {
-  const { accessMode, returnHeader, authRoute } = {
-    ...defaultOptions,
-    ...options,
-  };
+  const { accessMode, returnHeader, authRoute } = { ...defaultOptions, ...options };
 
   return async function verifyTokenMiddleware(ctx: Context, next: Next) {
+    // Get shop from query string
+    const { query, querystring } = ctx;
+    const shop = query.shop?.toString() ?? "";
+
     try {
-      // Load the current session (this will validate the JWT signature, so we know that the token was signed by Shopify)
+      // Load the user's access token session (this will validate the JWT signature of the request session token, so we know that it was signed by Shopify)
       const sessionData = await Shopify.Utils.loadCurrentSession(
         ctx.req,
         ctx.res,
         accessMode === "online"
       );
-      // Create session instance from loaded session data (if available), so we can call isActive() method on it
-      const session = sessionData ? Session.cloneSession(sessionData, sessionData.id) : null;
 
-      const { query, querystring } = ctx;
-      const shop = query.shop ? query.shop.toString() : "";
+      if (sessionData) {
+        // Create session instance from loaded session data so we can call isActive() method on it
+        const session = Session.cloneSession(sessionData, sessionData.id);
 
-      // Login again if the shops don't match
-      if (session && shop && session.shop !== shop) {
-        await clearSession(ctx, accessMode);
-        ctx.redirect(`${authRoute}?${querystring}`);
-        return;
-      }
+        // Login again if the shops don't match (not every request will have a shop query parameter, so only check if it's present)
+        if (shop && session.shop !== shop) {
+          console.warn(
+            `Shop '${shop}' does not match session shop '${session.shop}'. Redirecting to auth route...`
+          );
+          await clearSession(ctx, accessMode);
+          ctx.redirect(`${authRoute}?${querystring}`);
+          return;
+        }
 
-      if (session) {
         // Verify session is valid
         try {
           if (session.isActive()) {
-            await checkSessionOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
+            await checkAccessTokenOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
             // If we get here, the session is valid
             setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
-            return next();
+            return next(); // Continue to the next middleware since the session is valid
           }
         } catch (err) {
-          if (
-            err instanceof HttpResponseError &&
-            ((err as any)?.code === 401 || err.response?.code === 401) // Shopify API v3+ uses 'response.code' instead of 'code'
-          ) {
-            // Session not valid, we will re-authorize
-          } else {
-            throw err;
-          }
+          throwUnlessAuthError(err);
         }
       }
 
-      // ! If we get here, either the session is invalid or we need to re-authorize
+      // ! The session is missing or invalid, so we need to get a new one.
 
-      // We need to re-authenticate
-      if (returnHeader) {
+      // Get the session token from the authorization header (only if it's an embedded app)
+      const isEmbeddedApp = Shopify.Context.IS_EMBEDDED_APP;
+      const encodedSessionToken = isEmbeddedApp ? getEncodedSessionToken(ctx) : null;
+      const sessionToken = encodedSessionToken
+        ? Shopify.Utils.decodeSessionToken(encodedSessionToken)
+        : null;
+
+      // if (encodedSessionToken && sessionToken) {
+      //   // Exchange the session token for an access token
+      //   const shop = getShopFromSessionToken(sessionToken);
+      //   await exchangeSessionTokenForAccessToken(shop, encodedSessionToken, accessMode);
+      // }
+
+      // ! Exchanging the session token for an access token failed, so we have to reauthenticate using the auth route.
+
+      // We need to redirect to the auth route to get a new session
+      if (returnHeader && sessionToken) {
         // Return a header to the client so they can re-authorize
         ctx.response.status = 401;
         ctx.response.set(REAUTH_HEADER, "1"); // Tell the client to re-authorize by setting the reauth header
         // Get the shop from the session, or the auth header (we can't get it from the query if we're making a post request)
-        let reauthUrl = authRoute ?? "";
-        if (Shopify.Context.IS_EMBEDDED_APP) {
-          reauthUrl += `?${getShopAndHostQueryStringFromAuthHeader(ctx)}`;
-        } else {
-          reauthUrl += `?${new URL(ctx.header.referer ?? "").search}`; // Get parameters from the referer header (not completely sure if this will work)
-        }
+        const reauthUrl = `${authRoute ?? ""}${getShopAndHostQueryStringFromSessionToken(
+          sessionToken
+        )}`;
         ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
       } else {
         // Otherwise redirect to the auth page
         ctx.redirect(`${authRoute}?${querystring}`);
       }
 
-      // Catch session errors and redirect to auth page
-    } catch (err) {
-      if (
-        err instanceof Shopify.Errors.InvalidJwtError ||
-        err instanceof Shopify.Errors.MissingJwtTokenError ||
-        err instanceof Shopify.Errors.SessionNotFound
-      ) {
-        console.warn(err.message);
-        // If the session is invalid, clear the session and redirect to the auth route
-        await clearSession(ctx, accessMode);
-        ctx.redirect(`${authRoute}?${getShopAndHostQueryStringFromAuthHeader(ctx)}`);
-        return;
-      } else {
-        throw err;
-      }
+      // Catch JWT session token errors
+    } catch (err: any) {
+      // TODO: We just throw an error even if the token is invalid to avoid breaking changes, but we can change this later if we want to handle it better.
+      // if (err instanceof Shopify.Errors.InvalidJwtError) {
+      //   console.warn(`Invalid JWT token: ${err.message}`);
+      //   ctx.response.status = 403;
+      //   ctx.response.body = "Invalid JWT token";
+      //   return;
+      // } else if (err instanceof Shopify.Errors.MissingJwtTokenError) {
+      //   console.warn(`Missing JWT token: ${err.message}`);
+      //   ctx.response.status = 401;
+      //   ctx.response.body = "Missing JWT token";
+      //   return;
+      // }
+      ctx.throw(500, err instanceof Error ? err.message : "Unknown error");
     }
   };
 }
@@ -124,10 +138,9 @@ async function clearSession(ctx: Context, accessMode = defaultOptions.accessMode
 const VERIFY_TOKEN_REQUEST_CACHE = new LRUCache({
   max: 1000,
   ttl: 1000 * 60 * 60, // 1 hour
-  // Don't use the fetchMethod, because we want to catch errors and I think it might handle the error without throwing
 });
 
-async function checkSessionOnShopifyAPI(session: Session) {
+async function checkAccessTokenOnShopifyAPI(session: Session) {
   const { shop, accessToken } = session;
   // Theoretically there's no need to check the access token by calling the API, because the JWT token expires after 1 minute, so the only way we can be here is if Shopify gave the user a valid JWT token.
   // However, in case the access token has been corrupted in the database or something, we should check it at least once by calling the API.
@@ -142,14 +155,13 @@ async function checkSessionOnShopifyAPI(session: Session) {
   }
 }
 
-function getShopAndHostQueryStringFromAuthHeader(ctx: Context): string | null {
-  const authHeader: string = ctx.req.headers.authorization ?? "";
-  const matches = authHeader?.match(/Bearer (.*)/);
-  if (matches) {
-    const payload = Shopify.Utils.decodeSessionToken(matches[1]);
-    const shop = payload.dest.replace("https://", "");
-    const host = Buffer.from(payload.iss.replace("https://", "")).toString("base64");
-    return new URLSearchParams({ shop, host }).toString();
-  }
-  return null;
+// https://shopify.dev/docs/apps/auth/get-access-tokens/token-exchange
+async function exchangeSessionTokenForAccessToken(
+  shop: string,
+  encodedSessionToken: string,
+  tokenType?: "online" | "offline"
+) {
+  tokenType = tokenType ?? defaultOptions.accessMode;
+  console.log(`Exchanging session token for ${tokenType} access token for shop '${shop}'...`);
+  const client = new HttpClient(shop);
 }

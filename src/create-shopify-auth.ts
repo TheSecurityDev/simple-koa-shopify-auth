@@ -6,6 +6,7 @@ import {
   shouldPerformTopLevelOAuth,
   startTopLevelOauthRedirect,
 } from "./top-level-oauth-redirect";
+import { validateShop } from "./utils";
 
 type OAuthBeginConfig = {
   accessMode?: "online" | "offline";
@@ -87,8 +88,6 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
             // This is likely because the OAuth session cookie expired before the merchant approved the request
             ctx.redirect(`${oAuthStartPath}?${querystring}`);
             break;
-          case err instanceof Shopify.Errors.InvalidJwtError:
-            ctx.throw(401, message);
           default:
             ctx.throw(500, message);
         }
@@ -98,9 +97,4 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
 
     await next();
   };
-}
-
-export function validateShop(shop: string): boolean {
-  const shopUrlRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.(com|io)[/]*$/;
-  return shopUrlRegex.test(shop);
 }
