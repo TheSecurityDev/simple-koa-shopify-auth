@@ -1,6 +1,7 @@
-import Shopify from "@shopify/shopify-api";
+import Shopify, { DataType } from "@shopify/shopify-api";
 import { Session } from "@shopify/shopify-api/dist/auth/session";
 import { HttpClient } from "@shopify/shopify-api/dist/clients/http_client/http_client";
+import { HttpResponseError } from "@shopify/shopify-api/dist/error";
 import { JwtPayload } from "@shopify/shopify-api/dist/utils/decode-session-token";
 import { Context, Next } from "koa";
 import { LRUCache } from "lru-cache";
@@ -61,8 +62,8 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         try {
           if (session.isActive()) {
             await checkAccessTokenOnShopifyAPI(session); // Throws a 401 error if the access token is invalid
-            // If we get here, the session is valid
-            setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie
+            // If we get here, the session is valid, so we can continue to the next middleware
+            setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie (probably not needed, but just in case)
             return next(); // Continue to the next middleware since the session is valid
           }
         } catch (err) {
@@ -79,11 +80,27 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         ? Shopify.Utils.decodeSessionToken(encodedSessionToken)
         : null;
 
-      // if (encodedSessionToken && sessionToken) {
-      //   // Exchange the session token for an access token
-      //   const shop = getShopFromSessionToken(sessionToken);
-      //   await exchangeSessionTokenForAccessToken(shop, encodedSessionToken, accessMode);
-      // }
+      if (encodedSessionToken && sessionToken) {
+        const shop = getShopFromSessionToken(sessionToken);
+        // Exchange the session token for a session with an access token
+        const session = await exchangeSessionTokenForAccessTokenSession(
+          shop,
+          encodedSessionToken,
+          accessMode
+        );
+        // Check if the session is valid before saving it
+        if (session.isActive()) {
+          // Save the new session
+          await Shopify.Utils.storeSession(session);
+          // Continue to the next middleware since the session is valid
+          setTopLevelOAuthCookieValue(ctx, null); // Clear the cookie (probably not needed, but just in case)
+          return next();
+        } else {
+          console.warn(
+            `The session '${session.id}' we just got from Shopify is not active for shop '${shop}'`
+          );
+        }
+      }
 
       // ! Exchanging the session token for an access token failed, so we have to reauthenticate using the auth route.
 
@@ -92,7 +109,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         // Return a header to the client so they can re-authorize
         ctx.response.status = 401;
         ctx.response.set(REAUTH_HEADER, "1"); // Tell the client to re-authorize by setting the reauth header
-        // Get the shop from the session, or the auth header (we can't get it from the query if we're making a post request)
+        // Construct the shop and host params from the session token (we can't get it from the query if we're making a post request)
         const reauthUrl = `${authRoute ?? ""}${getShopAndHostQueryStringFromSessionToken(
           sessionToken
         )}`;
@@ -154,13 +171,56 @@ async function checkAccessTokenOnShopifyAPI(session: Session) {
   }
 }
 
-// https://shopify.dev/docs/apps/auth/get-access-tokens/token-exchange
-async function exchangeSessionTokenForAccessToken(
+/** Given the shop, encoded JWT session token, and token type, return a session object with an access token.
+    https://shopify.dev/docs/apps/auth/get-access-tokens/token-exchange */
+async function exchangeSessionTokenForAccessTokenSession(
   shop: string,
   encodedSessionToken: string,
   tokenType?: "online" | "offline"
 ) {
   tokenType = tokenType ?? defaultOptions.accessMode;
+
   console.log(`Exchanging session token for ${tokenType} access token for shop '${shop}'...`);
-  const client = new HttpClient(shop);
+
+  // Construct the request body
+  const body = {
+    client_id: Shopify.Context.API_KEY,
+    client_secret: Shopify.Context.API_SECRET_KEY,
+    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+    subject_token: encodedSessionToken,
+    subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
+    requested_token_type: `urn:shopify:params:oauth:token-type:${tokenType}-access-token`,
+  };
+
+  // Make the request
+  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": DataType.JSON, Accept: DataType.JSON },
+  });
+
+  // Check the response for errors
+  if (!response.ok) {
+    const { status, statusText, headers } = response;
+    throw new HttpResponseError({
+      message: `Failed to exchange session token for access token: ${status} ${statusText}`,
+      code: status,
+      statusText,
+      body,
+      headers: headers as any,
+    });
+  }
+
+  // Parse the response
+  const sessionResponse: Omit<Session, "id"> = await response.json(); // The returned session is missing the id, so we'll need to add it
+
+  // Get the new session id
+  const sessionId =
+    tokenType === "online"
+      ? `${shop}_${sessionResponse.onlineAccessInfo?.associated_user.id}`
+      : `offline_${shop}`;
+  console.log(`Got ${tokenType} access token for shop '${shop}' in session '${sessionId}'`);
+
+  // Create and return the new session object
+  return Session.cloneSession(sessionResponse as Session, sessionId);
 }
