@@ -42,7 +42,7 @@ export async function exchangeSessionTokenForAccessTokenSession(
   }
 
   // Parse the response
-  const sessionResponse: OnlineAccessResponse = await response.json(); // The returned session is missing the id, so we'll need to add it
+  const sessionResponse: OnlineAccessResponse = await response.json();
 
   // Create and return the session
   return createSession(sessionResponse, shop);
