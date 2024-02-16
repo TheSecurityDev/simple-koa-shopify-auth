@@ -10,6 +10,8 @@ export async function exchangeSessionTokenForAccessTokenSession(
   encodedSessionToken: string,
   tokenType: "online" | "offline"
 ) {
+  const sanitizedShop = Shopify.Utils.sanitizeShop(shop, true);
+
   // Construct the request body
   const body = {
     client_id: Shopify.Context.API_KEY,
@@ -21,7 +23,7 @@ export async function exchangeSessionTokenForAccessTokenSession(
   };
 
   // Make the request
-  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+  const response = await fetch(`https://${sanitizedShop}/admin/oauth/access_token`, {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "Content-Type": DataType.JSON, Accept: DataType.JSON },
