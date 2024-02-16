@@ -119,18 +119,11 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
       // Catch JWT session token errors
     } catch (err: any) {
-      // TODO: We just throw an error even if the token is invalid to avoid breaking changes, but we can change this later if we want to handle it better.
-      // if (err instanceof Shopify.Errors.InvalidJwtError) {
-      //   console.warn(`Invalid JWT token: ${err.message}`);
-      //   ctx.response.status = 403;
-      //   ctx.response.body = "Invalid JWT token";
-      //   return;
-      // } else if (err instanceof Shopify.Errors.MissingJwtTokenError) {
-      //   console.warn(`Missing JWT token: ${err.message}`);
-      //   ctx.response.status = 401;
-      //   ctx.response.body = "Missing JWT token";
-      //   return;
-      // }
+      if (err instanceof Shopify.Errors.InvalidJwtError) {
+        ctx.throw(401, `Invalid JWT token: ${err.message}`);
+      } else if (err instanceof Shopify.Errors.MissingJwtTokenError) {
+        ctx.throw(401, `Missing JWT token: ${err.message}`);
+      }
       ctx.throw(500, err instanceof Error ? err.message : "Unknown error");
     }
   };
