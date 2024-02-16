@@ -8,9 +8,7 @@ export function throwUnlessAuthError(err: HttpResponseError | Error | unknown) {
   if (err instanceof HttpResponseError) {
     // NOTE: Shopify API v3+ uses 'response.code' instead of 'code'
     const code = (err as any)?.code ?? err.response?.code;
-    if (code === 401) {
-      return; // Catch the 401 error so we can re-authorize
-    }
+    if (code === 401) return; // Catch the 401 error so we can re-authorize
   }
   throw err; // Throw any other errors
 }
@@ -30,12 +28,6 @@ export function getEncodedSessionToken(ctx: Context) {
     throw new Error("Session tokens are only available in embedded apps");
   }
 }
-
-// /** Parse and decode the JWT session token from the request context. */
-// function parseAndDecodeSessionToken(ctx: Context) {
-//   const encodedToken = getEncodedSessionToken(ctx);
-//   return Shopify.Utils.decodeSessionToken(encodedToken);
-// }
 
 /** Get the shop from the JWT session token. */
 export function getShopFromSessionToken(sessionToken: JwtPayload) {
