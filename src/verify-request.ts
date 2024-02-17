@@ -81,12 +81,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       if (encodedSessionToken && sessionToken) {
         const shop = getShopFromSessionToken(sessionToken);
         // Exchange the session token for a session with an access token and save it to storage
-        await exchangeSessionTokenForAccessTokenSession(
-          shop,
-          encodedSessionToken,
-          accessMode,
-          true
-        );
+        await exchangeSessionTokenForAccessTokenSession(shop, encodedSessionToken, accessMode);
         // Clear the top level oauth cookie since we have a valid session (maybe not necessary, but just in case)
         setTopLevelOAuthCookieValue(ctx, null);
         // Continue to the next middleware since the session is valid
