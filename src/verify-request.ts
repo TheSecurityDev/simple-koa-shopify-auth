@@ -6,10 +6,10 @@ import { LRUCache } from "lru-cache";
 import { exchangeSessionTokenForAccessTokenSession } from "./token-exchange";
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
 import {
+  AuthFailureHeader,
   getEncodedSessionToken,
   getShopFromSessionToken,
   getShopAndHostQueryStringFromSessionToken,
-  setReauthResponse,
   throwUnlessAuthError,
 } from "./utils";
 
@@ -91,12 +91,15 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       // ! Exchanging the session token for an access token failed, so we have to reauthenticate using the auth route.
 
       // We need to redirect to the auth route to get a new session
+      // NOTE: We check if the sessionToken exists since that can only be the case if it's an embedded app, and we need it to get the shop and host query params
       if (returnHeader && sessionToken) {
         // Set the reauth headers and status code
         const reauthUrl = `${authRoute ?? ""}?${getShopAndHostQueryStringFromSessionToken(
           sessionToken
         )}`;
-        setReauthResponse(ctx, reauthUrl);
+        ctx.response.status = 401; // Set the status to 401
+        ctx.response.set(AuthFailureHeader.Reauthorize, "1"); // Tell the client to re-authorize by setting the reauth header
+        ctx.response.set(AuthFailureHeader.ReauthorizeUrl, reauthUrl); // Tell the client where to re-authorize
       } else {
         // Otherwise redirect to the auth page
         ctx.redirect(`${authRoute}?${querystring}`);
@@ -104,13 +107,14 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
       // Catch JWT session token errors
     } catch (err: any) {
-      // TODO: Using ctx.throw will still end up returning a 500 error, so maybe we shouldn't use that for the JWT token errors. Or maybe it's okay and we want to do that.
-      if (err instanceof Shopify.Errors.InvalidJwtError) {
-        ctx.throw(401, `Invalid JWT token: ${err.message}`);
-      } else if (err instanceof Shopify.Errors.MissingJwtTokenError) {
-        ctx.throw(401, `Missing JWT token: ${err.message}`);
+      const isMissingJwt = err instanceof Shopify.Errors.MissingJwtTokenError;
+      if (isMissingJwt || err instanceof Shopify.Errors.InvalidJwtError) {
+        ctx.response.status = 401;
+        ctx.response.set(AuthFailureHeader.InvalidSessionTokenError, "1"); // Tell the client the session token is invalid so it can try again with a new one
+        ctx.response.body = `${isMissingJwt ? "Missing" : "Invalid"} session token`;
+      } else {
+        ctx.throw(500, err instanceof Error ? err.message : "Unknown error");
       }
-      ctx.throw(500, err instanceof Error ? err.message : "Unknown error");
     }
   };
 }
