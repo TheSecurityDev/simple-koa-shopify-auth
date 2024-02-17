@@ -81,7 +81,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
       if (encodedSessionToken && sessionToken) {
         const shop = getShopFromSessionToken(sessionToken);
-        // Exchange the session token for a session with an access token
+        // Exchange the session token for a session with an access token and save it to storage
         const session = await exchangeSessionTokenForAccessTokenSession(
           shop,
           encodedSessionToken,

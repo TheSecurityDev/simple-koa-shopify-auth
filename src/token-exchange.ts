@@ -1,16 +1,75 @@
 import Shopify, { DataType, OnlineAccessResponse } from "@shopify/shopify-api";
 import { HttpResponseError } from "@shopify/shopify-api/dist/error";
+import { Session } from "@shopify/shopify-api/dist/auth/session";
 
 import { createSession } from "./session";
 
+// Cache object with current requests so we can avoid making the same request multiple times.
+// This is useful when multiple API requests are made with an invalid session token, and we don't want to call the callback multiple times.
+// The key is in the format `[tokenType]:[encodedSessionToken]` and the value is the promise of the request.
+const currentTokenExchangeRequests = new Map<string, Promise<Session>>();
+
 /** Given the shop, encoded JWT session token, and token type, return a session object with an access token.
-    https://shopify.dev/docs/apps/auth/get-access-tokens/token-exchange */
+    https://shopify.dev/docs/apps/auth/get-access-tokens/token-exchange
+
+    The request will be de-duplicated, so if multiple requests are made at once with the same shop, token and token type, only one request will be made.
+
+    @param shop The shop's myshopify domain
+    @param encodedSessionToken The encoded JWT session token
+    @param tokenType The type of access token to exchange for ('online' or 'offline')
+    @param saveSession If true, the new session will be saved to storage (default)
+
+    @returns The new session object
+    */
 export async function exchangeSessionTokenForAccessTokenSession(
   shop: string,
   encodedSessionToken: string,
   tokenType: "online" | "offline",
   saveSession = true // If true, the new session will be saved to storage
 ) {
+  // Check if we already have a request in progress
+  const key = `${shop}:${tokenType}:${encodedSessionToken}`;
+  const existingRequest = currentTokenExchangeRequests.get(key);
+
+  // Make the request or use the existing one
+  let request: Promise<Session>;
+  if (existingRequest) {
+    request = existingRequest; // If we already have a request in progress, use it
+  } else {
+    // Otherwise make the request with a timeout
+    const requestOrTimeout = Promise.race([
+      makeTokenExchangeRequest({ shop, encodedSessionToken, tokenType }),
+      new Promise<Session>((resolve, reject) =>
+        setTimeout(() => reject(new Error("Request timed out")), 10000)
+      ),
+    ]);
+    // Save the request to the cache
+    currentTokenExchangeRequests.set(key, requestOrTimeout);
+    // When the request is done, remove it from the cache
+    requestOrTimeout.finally(() => {
+      currentTokenExchangeRequests.delete(key);
+    });
+    // Use the new request
+    request = requestOrTimeout;
+  }
+
+  // Wait for the request to finish
+  const session = await request;
+
+  // Save the session to storage if requested
+  if (saveSession) await Shopify.Utils.storeSession(session);
+
+  return session;
+}
+
+// Internal function that makes the request to Shopify to exchange the session token for an access token. The main function is a wrapper around this one that implements de-duplicating the requests.
+async function makeTokenExchangeRequest(params: {
+  shop: string;
+  encodedSessionToken: string;
+  tokenType: "online" | "offline";
+}) {
+  const { shop, encodedSessionToken, tokenType } = params;
+
   const sanitizedShop = Shopify.Utils.sanitizeShop(shop, true);
 
   // Construct the request body
@@ -26,8 +85,8 @@ export async function exchangeSessionTokenForAccessTokenSession(
   // Make the request
   const response = await fetch(`https://${sanitizedShop}/admin/oauth/access_token`, {
     method: "POST",
-    body: JSON.stringify(body),
     headers: { "Content-Type": DataType.JSON, Accept: DataType.JSON },
+    body: JSON.stringify(body),
   });
 
   // Check the response for errors
@@ -53,11 +112,6 @@ export async function exchangeSessionTokenForAccessTokenSession(
     throw new Error(
       `The session '${session?.id}' we just got from Shopify is not active for shop '${shop}'`
     );
-  }
-
-  // Save the session to storage if requested
-  if (saveSession) {
-    await Shopify.Utils.storeSession(session);
   }
 
   return session;
