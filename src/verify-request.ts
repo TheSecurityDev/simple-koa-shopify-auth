@@ -85,24 +85,16 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
         const session = await exchangeSessionTokenForAccessTokenSession(
           shop,
           encodedSessionToken,
-          accessMode
+          accessMode,
+          true
         );
-        // Check if the session is valid before saving it
-        if (session.isActive()) {
-          // Save the new session
-          await Shopify.Utils.storeSession(session);
-          // Call the afterSessionRefresh callback if provided
-          const continueNext = await afterSessionRefresh?.(ctx, session);
-          if (continueNext === false) return; // If the callback returns false, then we don't continue to the next middleware
-          // Clear the top level oauth cookie since we have a valid session (maybe not necessary, but just in case)
-          setTopLevelOAuthCookieValue(ctx, null);
-          // Continue to the next middleware since the session is valid
-          return next();
-        } else {
-          console.warn(
-            `The session '${session.id}' we just got from Shopify is not active for shop '${shop}'`
-          );
-        }
+        // Call the afterSessionRefresh callback if provided
+        const continueNext = await afterSessionRefresh?.(ctx, session);
+        if (continueNext === false) return; // If the callback returns false, then we don't continue to the next middleware
+        // Clear the top level oauth cookie since we have a valid session (maybe not necessary, but just in case)
+        setTopLevelOAuthCookieValue(ctx, null);
+        // Continue to the next middleware since the session is valid
+        return next();
       }
 
       // ! Exchanging the session token for an access token failed, so we have to reauthenticate using the auth route.

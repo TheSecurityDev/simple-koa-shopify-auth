@@ -8,7 +8,8 @@ import { createSession } from "./session";
 export async function exchangeSessionTokenForAccessTokenSession(
   shop: string,
   encodedSessionToken: string,
-  tokenType: "online" | "offline"
+  tokenType: "online" | "offline",
+  saveSession = true // If true, the new session will be saved to storage
 ) {
   const sanitizedShop = Shopify.Utils.sanitizeShop(shop, true);
 
@@ -44,6 +45,20 @@ export async function exchangeSessionTokenForAccessTokenSession(
   // Parse the response
   const sessionResponse: OnlineAccessResponse = await response.json();
 
-  // Create and return the session
-  return createSession(sessionResponse, shop);
+  // Create the session
+  const session = createSession(sessionResponse, shop);
+
+  // Make sure the session is active
+  if (!session.isActive()) {
+    throw new Error(
+      `The session '${session?.id}' we just got from Shopify is not active for shop '${shop}'`
+    );
+  }
+
+  // Save the session to storage if requested
+  if (saveSession) {
+    await Shopify.Utils.storeSession(session);
+  }
+
+  return session;
 }
