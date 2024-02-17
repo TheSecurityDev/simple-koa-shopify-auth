@@ -3,6 +3,11 @@ import { MissingJwtTokenError, HttpResponseError } from "@shopify/shopify-api/di
 import { JwtPayload } from "@shopify/shopify-api/dist/utils/decode-session-token";
 import { Context } from "koa";
 
+export enum ReauthHeader {
+  Reauthorize = "X-Shopify-API-Request-Failure-Reauthorize",
+  ReauthorizeUrl = "X-Shopify-API-Request-Failure-Reauthorize-Url",
+}
+
 /** Throw the error, unless it's an `HttpResponseError` with status `401`. */
 export function throwUnlessAuthError(err: HttpResponseError | Error | unknown) {
   if (err instanceof HttpResponseError) {
@@ -11,6 +16,13 @@ export function throwUnlessAuthError(err: HttpResponseError | Error | unknown) {
     if (code === 401) return; // Catch the 401 error so we can re-authorize
   }
   throw err; // Throw any other errors
+}
+
+/** Set the response status to 401 and add the appropriate headers to tell the client to reauthorize. */
+export function setReauthResponse(ctx: Context, reauthUrl: string) {
+  ctx.response.status = 401;
+  ctx.response.set(ReauthHeader.Reauthorize, "1"); // Tell the client to re-authorize by setting the reauth header
+  ctx.response.set(ReauthHeader.ReauthorizeUrl, reauthUrl); // Tell the client where to re-authorize
 }
 
 ////////////////////////////

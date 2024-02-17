@@ -9,6 +9,7 @@ import {
   getEncodedSessionToken,
   getShopFromSessionToken,
   getShopAndHostQueryStringFromSessionToken,
+  setReauthResponse,
   throwUnlessAuthError,
 } from "./utils";
 
@@ -24,9 +25,6 @@ const defaultOptions: Omit<Required<VerifyRequestOptions>, "afterSessionRefresh"
   authRoute: "/auth",
   returnHeader: false,
 };
-
-const REAUTH_HEADER = "X-Shopify-API-Request-Failure-Reauthorize";
-const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
 
 export default function verifyRequest(options?: VerifyRequestOptions) {
   const { accessMode, returnHeader, authRoute, afterSessionRefresh } = {
@@ -110,14 +108,11 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
       // We need to redirect to the auth route to get a new session
       if (returnHeader && sessionToken) {
-        // Return a header to the client so they can re-authorize
-        ctx.response.status = 401;
-        ctx.response.set(REAUTH_HEADER, "1"); // Tell the client to re-authorize by setting the reauth header
-        // Construct the shop and host params from the session token (we can't get it from the query if we're making a post request)
+        // Set the reauth headers and status code
         const reauthUrl = `${authRoute ?? ""}?${getShopAndHostQueryStringFromSessionToken(
           sessionToken
         )}`;
-        ctx.response.set(REAUTH_URL_HEADER, reauthUrl); // Set the reauth url header
+        setReauthResponse(ctx, reauthUrl);
       } else {
         // Otherwise redirect to the auth page
         ctx.redirect(`${authRoute}?${querystring}`);
