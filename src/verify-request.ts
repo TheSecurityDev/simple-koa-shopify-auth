@@ -6,12 +6,17 @@ import { LRUCache } from "lru-cache";
 import { exchangeSessionTokenForAccessTokenSession } from "./token-exchange";
 import { setTopLevelOAuthCookieValue } from "./top-level-oauth-redirect";
 import {
-  AuthFailureHeader,
   getEncodedSessionToken,
   getShopFromSessionToken,
   getShopAndHostQueryStringFromSessionToken,
   throwUnlessAuthError,
 } from "./utils";
+
+export enum AuthFailureHeader {
+  Reauthorize = "X-Shopify-API-Request-Failure-Reauthorize",
+  ReauthorizeUrl = "X-Shopify-API-Request-Failure-Reauthorize-Url",
+  InvalidSessionTokenError = "X-Shopify-API-Request-Failure-Invalid-Session-Token",
+}
 
 type VerifyRequestOptions = {
   accessMode?: "online" | "offline";

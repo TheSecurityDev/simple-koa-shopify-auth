@@ -3,12 +3,6 @@ import { MissingJwtTokenError, HttpResponseError } from "@shopify/shopify-api/di
 import { JwtPayload } from "@shopify/shopify-api/dist/utils/decode-session-token";
 import { Context } from "koa";
 
-export enum AuthFailureHeader {
-  Reauthorize = "X-Shopify-API-Request-Failure-Reauthorize",
-  ReauthorizeUrl = "X-Shopify-API-Request-Failure-Reauthorize-Url",
-  InvalidSessionTokenError = "X-Shopify-API-Request-Failure-Invalid-Session-Token",
-}
-
 /** Throw the error, unless it's an `HttpResponseError` with status `401`. */
 export function throwUnlessAuthError(err: HttpResponseError | Error | unknown) {
   if (err instanceof HttpResponseError) {
