@@ -1,4 +1,6 @@
-import createShopifyAuth, { validateShop } from "./create-shopify-auth";
-import verifyRequest from "./verify-request";
+import createShopifyAuth from "./create-shopify-auth";
+import verifyRequest, { AuthFailureHeader } from "./verify-request";
 
-export { createShopifyAuth, validateShop, verifyRequest };
+export { createShopifyAuth, verifyRequest, AuthFailureHeader };
+export { createSession } from "./session";
+export { exchangeSessionTokenForAccessTokenSession } from "./token-exchange";

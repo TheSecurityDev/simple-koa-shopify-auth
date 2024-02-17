@@ -37,8 +37,8 @@ export async function startTopLevelOauthRedirect(ctx: Context, apiKey: string, p
   setTopLevelOAuthCookieValue(ctx, "1");
   let { query } = ctx;
   const hostName = Shopify.Context.HOST_NAME; // Use this instead of ctx.host to prevent issues when behind a proxy
-  const shop = query.shop ? query.shop.toString() : "";
-  const host = query.host ? query.host.toString() : "";
+  const shop = Shopify.Utils.sanitizeShop(query.shop?.toString() ?? "") ?? "";
+  const host = Shopify.Utils.sanitizeHost(query.host?.toString() ?? "") ?? "";
   const params = { shop, host };
   const queryString = new URLSearchParams(params).toString(); // Use this instead of ctx.querystring, because it sanitizes the query parameters we are using
   ctx.body = await getTopLevelRedirectScript(

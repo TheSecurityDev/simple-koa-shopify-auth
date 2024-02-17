@@ -42,7 +42,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
       (path === oAuthStartPath && shouldPerformTopLevelOAuth(ctx))
     ) {
       // Auth started
-      if (!validateShop(shop)) {
+      if (!Shopify.Utils.sanitizeShop(shop)) {
         // Invalid shop
         ctx.response.status = 400;
         ctx.response.body = shop ? "Invalid shop parameter" : "Missing shop parameter";
@@ -74,9 +74,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
           query as unknown as AuthQuery
         );
         ctx.state.shopify = session;
-        if (config.afterAuth) {
-          await config.afterAuth(ctx);
-        }
+        await config.afterAuth?.(ctx);
       } catch (err) {
         const message = (err as Error).message;
         switch (true) {
@@ -87,8 +85,6 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
             // This is likely because the OAuth session cookie expired before the merchant approved the request
             ctx.redirect(`${oAuthStartPath}?${querystring}`);
             break;
-          case err instanceof Shopify.Errors.InvalidJwtError:
-            ctx.throw(401, message);
           default:
             ctx.throw(500, message);
         }
@@ -98,9 +94,4 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
 
     await next();
   };
-}
-
-export function validateShop(shop: string): boolean {
-  const shopUrlRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.(com|io)[/]*$/;
-  return shopUrlRegex.test(shop);
 }

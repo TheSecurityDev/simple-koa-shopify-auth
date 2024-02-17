@@ -55,7 +55,8 @@ _Importing differs slightly from the official library in that the `createShopify
 For requests, create the middleware like this:
 
 ```js
-// For requests from the frontend, we want to return headers, so we can check if we need to reauth on the client side
+// For API requests from the frontend, we want to return headers, so we can check if we need to reauthenticate on the client side.
+// NOTE: Now this isn't needed as often since we use the token exchange endpoint to get the online token.
 const verifyApiRequest = verifyRequest({ returnHeader: true });
 const verifyPageRequest = verifyRequest();
 ```
