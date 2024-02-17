@@ -17,7 +17,7 @@ type VerifyRequestOptions = {
   accessMode?: "online" | "offline";
   returnHeader?: boolean;
   authRoute?: string;
-  afterSessionRefresh?: (ctx: Context, session: Session) => Promise<void>;
+  afterSessionRefresh?: (ctx: Context, session: Session) => Promise<boolean | void>;
 };
 
 const defaultOptions: Omit<Required<VerifyRequestOptions>, "afterSessionRefresh"> = {
@@ -92,7 +92,8 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
           // Save the new session
           await Shopify.Utils.storeSession(session);
           // Call the afterSessionRefresh callback if provided
-          await afterSessionRefresh?.(ctx, session);
+          const continueNext = await afterSessionRefresh?.(ctx, session);
+          if (continueNext === false) return; // If the callback returns false, then we don't continue to the next middleware
           // Clear the top level oauth cookie since we have a valid session (maybe not necessary, but just in case)
           setTopLevelOAuthCookieValue(ctx, null);
           // Continue to the next middleware since the session is valid
@@ -120,6 +121,7 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
 
       // Catch JWT session token errors
     } catch (err: any) {
+      // TODO: Using ctx.throw will still end up returning a 500 error, so maybe we shouldn't use that for the JWT token errors. Or maybe it's okay and we want to do that.
       if (err instanceof Shopify.Errors.InvalidJwtError) {
         ctx.throw(401, `Invalid JWT token: ${err.message}`);
       } else if (err instanceof Shopify.Errors.MissingJwtTokenError) {

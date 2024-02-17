@@ -74,9 +74,7 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
           query as unknown as AuthQuery
         );
         ctx.state.shopify = session;
-        if (config.afterAuth) {
-          await config.afterAuth(ctx);
-        }
+        await config.afterAuth?.(ctx);
       } catch (err) {
         const message = (err as Error).message;
         switch (true) {

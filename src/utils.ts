@@ -20,7 +20,7 @@ export function throwUnlessAuthError(err: HttpResponseError | Error | unknown) {
 
 /** Set the response status to 401 and add the appropriate headers to tell the client to reauthorize. */
 export function setReauthResponse(ctx: Context, reauthUrl: string) {
-  ctx.response.status = 401;
+  ctx.response.status = 401; // Set the status to 401
   ctx.response.set(ReauthHeader.Reauthorize, "1"); // Tell the client to re-authorize by setting the reauth header
   ctx.response.set(ReauthHeader.ReauthorizeUrl, reauthUrl); // Tell the client where to re-authorize
 }
