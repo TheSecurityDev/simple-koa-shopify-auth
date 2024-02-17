@@ -28,38 +28,27 @@ export async function exchangeSessionTokenForAccessTokenSession(
   saveSession = true // If true, the new session will be saved to storage
 ) {
   // Check if we already have a request in progress
-  const key = `${shop}:${tokenType}:${encodedSessionToken}`;
+  const key = `${shop}:${tokenType}:${encodedSessionToken}:${saveSession}`;
   const existingRequest = currentTokenExchangeRequests.get(key);
+  if (existingRequest) return existingRequest; // If we already have a request in progress, use it
 
-  // Make the request or use the existing one
-  let request: Promise<Session>;
-  if (existingRequest) {
-    request = existingRequest; // If we already have a request in progress, use it
-  } else {
-    // Otherwise make the request with a timeout
-    const requestOrTimeout = Promise.race([
-      makeTokenExchangeRequest({ shop, encodedSessionToken, tokenType }),
-      new Promise<Session>((resolve, reject) =>
-        setTimeout(() => reject(new Error("Request timed out")), 10000)
-      ),
-    ]);
-    // Save the request to the cache
-    currentTokenExchangeRequests.set(key, requestOrTimeout);
-    // When the request is done, remove it from the cache
-    requestOrTimeout.finally(() => {
-      currentTokenExchangeRequests.delete(key);
-    });
-    // Use the new request
-    request = requestOrTimeout;
-  }
+  // Otherwise make the request with a timeout
+  const requestOrTimeout = Promise.race([
+    makeTokenExchangeRequest({ shop, encodedSessionToken, tokenType, saveSession }),
+    new Promise<Session>((resolve, reject) =>
+      setTimeout(() => reject(new Error("Request timed out")), 10000)
+    ),
+  ]);
 
-  // Wait for the request to finish
-  const session = await request;
+  // Save the request to the cache
+  currentTokenExchangeRequests.set(key, requestOrTimeout);
 
-  // Save the session to storage if requested
-  if (saveSession) await Shopify.Utils.storeSession(session);
+  // When the request is done, remove it from the cache
+  requestOrTimeout.finally(() => {
+    currentTokenExchangeRequests.delete(key);
+  });
 
-  return session;
+  return requestOrTimeout;
 }
 
 // Internal function that makes the request to Shopify to exchange the session token for an access token. The main function is a wrapper around this one that implements de-duplicating the requests.
@@ -67,8 +56,9 @@ async function makeTokenExchangeRequest(params: {
   shop: string;
   encodedSessionToken: string;
   tokenType: "online" | "offline";
+  saveSession: boolean;
 }) {
-  const { shop, encodedSessionToken, tokenType } = params;
+  const { shop, encodedSessionToken, tokenType, saveSession } = params;
 
   const sanitizedShop = Shopify.Utils.sanitizeShop(shop, true);
 
@@ -113,6 +103,9 @@ async function makeTokenExchangeRequest(params: {
       `The session '${session?.id}' we just got from Shopify is not active for shop '${shop}'`
     );
   }
+
+  // Save the session to storage if requested
+  if (saveSession) await Shopify.Utils.storeSession(session);
 
   return session;
 }
