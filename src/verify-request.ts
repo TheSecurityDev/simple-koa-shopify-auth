@@ -24,7 +24,7 @@ type VerifyRequestOptions = {
   authRoute?: string;
 };
 
-const defaultOptions: Omit<Required<VerifyRequestOptions>, "afterSessionRefresh"> = {
+const defaultOptions: Required<VerifyRequestOptions> = {
   accessMode: "online",
   authRoute: "/auth",
   returnHeader: false,

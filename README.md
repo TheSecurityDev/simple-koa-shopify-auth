@@ -70,7 +70,6 @@ _NOTE: These parameters differ from the ones in the official library._
   accessMode: "online",  // The access mode of the token to check
   authRoute: "/auth",  // Where to redirect if the session is invalid
   returnHeader: false,  // If true, set headers instead of redirecting if session is invalid
-  async afterSessionRefresh(ctx, session) { }  // Callback function after the session is refreshed using the token exchange endpoint
 }
 ```
 
