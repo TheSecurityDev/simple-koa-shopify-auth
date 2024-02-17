@@ -10,7 +10,7 @@ import {
 type OAuthBeginConfig = {
   accessMode?: "online" | "offline";
   authPath?: string;
-  afterAuth(ctx: Context): Promise<void>;
+  afterAuth(ctx: Context): Promise<boolean | void>;
 };
 
 export default function createShopifyAuth(options: OAuthBeginConfig) {
@@ -74,7 +74,8 @@ export default function createShopifyAuth(options: OAuthBeginConfig) {
           query as unknown as AuthQuery
         );
         ctx.state.shopify = session;
-        await config.afterAuth?.(ctx);
+        const continueNext = await config.afterAuth?.(ctx);
+        if (continueNext === false) return; // If the afterAuth function returns false, don't continue to the next middleware
       } catch (err) {
         const message = (err as Error).message;
         switch (true) {
