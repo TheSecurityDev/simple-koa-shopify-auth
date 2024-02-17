@@ -17,7 +17,6 @@ type VerifyRequestOptions = {
   accessMode?: "online" | "offline";
   returnHeader?: boolean;
   authRoute?: string;
-  afterSessionRefresh?: (ctx: Context, session: Session) => Promise<boolean | void>;
 };
 
 const defaultOptions: Omit<Required<VerifyRequestOptions>, "afterSessionRefresh"> = {
@@ -27,7 +26,7 @@ const defaultOptions: Omit<Required<VerifyRequestOptions>, "afterSessionRefresh"
 };
 
 export default function verifyRequest(options?: VerifyRequestOptions) {
-  const { accessMode, returnHeader, authRoute, afterSessionRefresh } = {
+  const { accessMode, returnHeader, authRoute } = {
     ...defaultOptions,
     ...options,
   };
@@ -82,15 +81,12 @@ export default function verifyRequest(options?: VerifyRequestOptions) {
       if (encodedSessionToken && sessionToken) {
         const shop = getShopFromSessionToken(sessionToken);
         // Exchange the session token for a session with an access token and save it to storage
-        const session = await exchangeSessionTokenForAccessTokenSession(
+        await exchangeSessionTokenForAccessTokenSession(
           shop,
           encodedSessionToken,
           accessMode,
           true
         );
-        // Call the afterSessionRefresh callback if provided
-        const continueNext = await afterSessionRefresh?.(ctx, session);
-        if (continueNext === false) return; // If the callback returns false, then we don't continue to the next middleware
         // Clear the top level oauth cookie since we have a valid session (maybe not necessary, but just in case)
         setTopLevelOAuthCookieValue(ctx, null);
         // Continue to the next middleware since the session is valid

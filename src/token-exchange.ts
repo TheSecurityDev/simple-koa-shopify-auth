@@ -5,8 +5,7 @@ import { Session } from "@shopify/shopify-api/dist/auth/session";
 import { createSession } from "./session";
 
 // Cache object with current requests so we can avoid making the same request multiple times.
-// This is useful when multiple API requests are made with an invalid session token, and we don't want to call the callback multiple times.
-// The key is in the format `[tokenType]:[encodedSessionToken]` and the value is the promise of the request.
+// The key is in the format `{shop}:{tokenType}:{encodedSessionToken}:{saveSession}` and the value is the promise of the request.
 const currentTokenExchangeRequests = new Map<string, Promise<Session>>();
 
 /** Given the shop, encoded JWT session token, and token type, return a session object with an access token.
